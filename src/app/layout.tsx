@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { ThemeProvider } from '@/components/layout/ThemeProvider';
 import { ClientLayout } from '@/components/layout/ClientLayout';
 import { DbProvider } from '@/components/providers/DbProvider';
+import { Analytics } from "@vercel/analytics/next"
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
