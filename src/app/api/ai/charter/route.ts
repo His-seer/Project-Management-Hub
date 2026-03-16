@@ -1,0 +1,118 @@
+import { NextRequest } from 'next/server';
+import Anthropic from '@anthropic-ai/sdk';
+
+export async function POST(req: NextRequest) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return Response.json(
+      { error: 'ANTHROPIC_API_KEY is not configured. Add it to your .env.local file.' },
+      { status: 500 }
+    );
+  }
+
+  const body = await req.json();
+  const { project } = body;
+
+  if (!project) {
+    return Response.json({ error: 'Project data is required' }, { status: 400 });
+  }
+
+  const client = new Anthropic({ apiKey });
+
+  const context = `
+PROJECT NAME: ${project.meta.name}
+DESCRIPTION: ${project.meta.description}
+START DATE: ${project.meta.startDate}
+TARGET END DATE: ${project.meta.targetEndDate}
+TOTAL BUDGET: $${project.funding?.totalBudget?.toLocaleString() ?? 'Not set'}
+TEAM SIZE: ${project.resources?.length ?? 0} resources
+
+EXISTING PLAN GOALS:
+${(project.plan?.goals ?? []).map((g: string, i: number) => `${i + 1}. ${g}`).join('\n') || 'None'}
+
+EXISTING DELIVERABLES:
+${(project.plan?.deliverables ?? []).map((d: { name: string; description: string }) => `- ${d.name}: ${d.description}`).join('\n') || 'None'}
+
+EXISTING MILESTONES:
+${(project.plan?.milestones ?? []).map((m: { name: string; dueDate: string }) => `- ${m.name} (${m.dueDate})`).join('\n') || 'None'}
+
+STAKEHOLDERS:
+${(project.stakeholders ?? []).map((s: { name: string; role: string }) => `- ${s.name} (${s.role})`).join('\n') || 'None'}
+  `.trim();
+
+  const systemPrompt = `You are an expert Project Manager writing a professional project charter.
+Your charters are clear, strategic, and suitable for executive approval.
+Be specific and actionable. Infer reasonable details from the project context.
+Format your response as valid JSON matching the exact schema provided.`;
+
+  const userPrompt = `Generate a comprehensive project charter based on the project data below.
+Return ONLY a valid JSON object with this exact structure:
+{
+  "executiveSummary": "2-3 sentence paragraph summarising the project, its purpose, and expected outcome",
+  "projectPurpose": "1-2 sentence statement of why this project exists and what problem it solves",
+  "vision": "1 sentence inspiring vision statement for the end state",
+  "objectives": ["objective 1", "objective 2", "objective 3", "objective 4", "objective 5"],
+  "businessObjectives": ["business objective 1", "business objective 2", "business objective 3"],
+  "technologyObjectives": ["tech objective 1", "tech objective 2", "tech objective 3"],
+  "scope": "2-3 sentences describing what is included in scope",
+  "outOfScope": "2-3 sentences describing what is explicitly excluded",
+  "assumptions": ["assumption 1", "assumption 2", "assumption 3"],
+  "constraints": ["constraint 1", "constraint 2", "constraint 3"],
+  "qualityStandards": ["standard 1", "standard 2", "standard 3"],
+  "successCriteria": ["criterion 1", "criterion 2", "criterion 3", "criterion 4"]
+}
+
+PROJECT DATA:
+${context}`;
+
+  try {
+    const stream = client.messages.stream({
+      model: 'claude-opus-4-6',
+      max_tokens: 2048,
+      thinking: { type: 'adaptive' },
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of stream) {
+            if (
+              event.type === 'content_block_delta' &&
+              event.delta.type === 'text_delta'
+            ) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
+              );
+            }
+          }
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Stream error';
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) {
+      return Response.json({ error: 'Invalid ANTHROPIC_API_KEY.' }, { status: 401 });
+    }
+    if (err instanceof Anthropic.RateLimitError) {
+      return Response.json({ error: 'Rate limit reached. Please wait and try again.' }, { status: 429 });
+    }
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
