@@ -2,6 +2,7 @@
 
 import { useCurrentProject, useProjectId } from '@/hooks/useCurrentProject';
 import { useProjectStore } from '@/stores/useProjectStore';
+import { useAiStore } from '@/stores/useAiStore';
 import type { Charter, CharterApproval } from '@/types';
 import {
   FileText,
@@ -27,6 +28,8 @@ export default function CharterPage() {
   const project = useCurrentProject();
   const projectId = useProjectId();
   const updateModule = useProjectStore((s) => s.updateModule);
+  const ai = useAiStore();
+  const selectedModel = ai.provider === 'anthropic' ? ai.anthropicModel : ai.provider === 'google' ? ai.googleModel : ai.openaiModel;
   const [exporting, setExporting] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -52,7 +55,7 @@ export default function CharterPage() {
       const res = await fetch('/api/ai/charter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project }),
+        body: JSON.stringify({ project, provider: ai.provider, model: selectedModel }),
       });
       if (!res.ok) {
         const err = await res.json();

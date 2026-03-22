@@ -1,23 +1,15 @@
 import { NextRequest } from 'next/server';
+import { streamAiResponse } from '@/lib/aiClient';
 import Anthropic from '@anthropic-ai/sdk';
+import type { AiProvider } from '@/stores/useAiStore';
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return Response.json(
-      { error: 'ANTHROPIC_API_KEY is not configured. Add it to your .env.local file.' },
-      { status: 500 }
-    );
-  }
-
   const body = await req.json();
-  const { project } = body;
+  const { project, provider, model }: { project: any; provider?: AiProvider; model?: string } = body;
 
   if (!project) {
     return Response.json({ error: 'Project data is required' }, { status: 400 });
   }
-
-  const client = new Anthropic({ apiKey });
 
   const closedRisks = (project.risks ?? []).filter((r: { status: string }) => r.status === 'closed' || r.status === 'accepted');
   const resolvedIssues = (project.issues ?? []).filter((i: { status: string }) => i.status === 'resolved' || i.status === 'closed');
@@ -78,6 +70,64 @@ Generate 4-6 lessons covering different categories and phases. Base them on the 
 PROJECT DATA:
 ${context}`;
 
+  const SSE_HEADERS = {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  };
+
+  if (provider && model) {
+    try {
+      const rawStream = await streamAiResponse({
+        provider,
+        model,
+        systemPrompt,
+        userMessage: userPrompt,
+      });
+
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream({
+        async start(controller) {
+          try {
+            const reader = rawStream.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const text = decoder.decode(value, { stream: true });
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
+              );
+            }
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          } catch (err) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Stream error' })}\n\n`
+              )
+            );
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(readable, { headers: SSE_HEADERS });
+    } catch (err) {
+      return Response.json(
+        { error: err instanceof Error ? err.message : 'Unknown error' },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Fallback: original Anthropic-only logic (backward compatible)
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey)
+    return Response.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 500 });
+
+  const client = new Anthropic({ apiKey });
+
   try {
     const stream = client.messages.stream({
       model: 'claude-opus-4-6',
@@ -92,10 +142,7 @@ ${context}`;
       async start(controller) {
         try {
           for await (const event of stream) {
-            if (
-              event.type === 'content_block_delta' &&
-              event.delta.type === 'text_delta'
-            ) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
               );
@@ -111,21 +158,15 @@ ${context}`;
       },
     });
 
-    return new Response(readable, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    });
+    return new Response(readable, { headers: SSE_HEADERS });
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) {
-      return Response.json({ error: 'Invalid ANTHROPIC_API_KEY.' }, { status: 401 });
-    }
-    if (err instanceof Anthropic.RateLimitError) {
-      return Response.json({ error: 'Rate limit reached. Please wait and try again.' }, { status: 429 });
-    }
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return Response.json({ error: message }, { status: 500 });
+    if (err instanceof Anthropic.AuthenticationError)
+      return Response.json({ error: 'Invalid API key.' }, { status: 401 });
+    if (err instanceof Anthropic.RateLimitError)
+      return Response.json({ error: 'Rate limit reached.' }, { status: 429 });
+    return Response.json(
+      { error: err instanceof Error ? err.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
 }

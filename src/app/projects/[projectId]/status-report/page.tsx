@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useCurrentProject, useProjectId } from '@/hooks/useCurrentProject';
 import { useProjectStore } from '@/stores/useProjectStore';
+import { useAiStore } from '@/stores/useAiStore';
 import type { StatusReport } from '@/types';
 import { generateId } from '@/lib/ids';
 import { overallCompleteness } from '@/lib/completeness';
@@ -33,6 +34,8 @@ export default function StatusReportPage() {
   const project = useCurrentProject();
   const projectId = useProjectId();
   const updateModule = useProjectStore((s) => s.updateModule);
+  const ai = useAiStore();
+  const selectedModel = ai.provider === 'anthropic' ? ai.anthropicModel : ai.provider === 'google' ? ai.googleModel : ai.openaiModel;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -57,7 +60,7 @@ export default function StatusReportPage() {
       const res = await fetch('/api/ai/status-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project }),
+        body: JSON.stringify({ project, provider: ai.provider, model: selectedModel }),
       });
 
       if (!res.ok) {
