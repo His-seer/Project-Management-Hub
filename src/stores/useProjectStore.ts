@@ -89,7 +89,7 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
     const project = createDefaultProject(meta);
     set((state) => ({ projects: { ...state.projects, [id]: project } }));
     // POST full project to create all rows
-    fetch('/api/projects', {
+    apiFetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, data: project }),

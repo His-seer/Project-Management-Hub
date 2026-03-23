@@ -1,15 +1,12 @@
 import { NextRequest } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { streamAiResponse } from '@/lib/aiClient';
-import type { AiProvider } from '@/stores/useAiStore';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     project,
-    provider,
     model,
-  }: { project: unknown; provider?: AiProvider; model?: string } = body;
+  }: { project: unknown; model?: string } = body;
 
   if (!project) return Response.json({ error: 'Project data is required' }, { status: 400 });
 
@@ -79,78 +76,26 @@ Return 3-5 insights. Prioritize warnings, then suggestions, then positives. Only
     Connection: 'keep-alive',
   };
 
-  // Multi-provider path: provider and model supplied in request body
-  if (provider && model) {
-    try {
-      const rawStream = await streamAiResponse({
-        provider,
-        model,
-        systemPrompt,
-        userMessage: userPrompt,
-      });
-
-      const encoder = new TextEncoder();
-      const readable = new ReadableStream({
-        async start(controller) {
-          try {
-            const reader = rawStream.getReader();
-            const decoder = new TextDecoder();
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              const text = decoder.decode(value, { stream: true });
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-              );
-            }
-            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-            controller.close();
-          } catch (err) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Stream error' })}\n\n`
-              )
-            );
-            controller.close();
-          }
-        },
-      });
-
-      return new Response(readable, { headers: SSE_HEADERS });
-    } catch (err) {
-      return Response.json(
-        { error: err instanceof Error ? err.message : 'Unknown error' },
-        { status: 500 }
-      );
-    }
-  }
-
-  // Fallback: original Anthropic-only logic (backward compatible)
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey)
-    return Response.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 500 });
-
-  const client = new Anthropic({ apiKey });
-
   try {
-    const stream = client.messages.stream({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
-      thinking: { type: 'adaptive' },
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
+    const rawStream = await streamAiResponse({
+      model: model || 'gemini-2.5-flash',
+      systemPrompt,
+      userMessage: userPrompt,
     });
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of stream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
-              );
-            }
+          const reader = rawStream.getReader();
+          const decoder = new TextDecoder();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const text = decoder.decode(value, { stream: true });
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
+            );
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
@@ -167,10 +112,6 @@ Return 3-5 insights. Prioritize warnings, then suggestions, then positives. Only
 
     return new Response(readable, { headers: SSE_HEADERS });
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError)
-      return Response.json({ error: 'Invalid API key.' }, { status: 401 });
-    if (err instanceof Anthropic.RateLimitError)
-      return Response.json({ error: 'Rate limit reached.' }, { status: 429 });
     return Response.json(
       { error: err instanceof Error ? err.message : 'Unknown error' },
       { status: 500 }

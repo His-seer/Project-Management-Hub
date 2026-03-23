@@ -9,6 +9,7 @@ import { generateId } from '@/lib/ids';
 import { overallCompleteness } from '@/lib/completeness';
 import { StatusReportPrint } from '@/components/print/StatusReportPrint';
 import { downloadAsPdf } from '@/lib/printExport';
+import apiFetch from '@/lib/apiFetch';
 import {
   FileBarChart,
   Plus,
@@ -35,7 +36,7 @@ export default function StatusReportPage() {
   const projectId = useProjectId();
   const updateModule = useProjectStore((s) => s.updateModule);
   const ai = useAiStore();
-  const selectedModel = ai.provider === 'anthropic' ? ai.anthropicModel : ai.provider === 'google' ? ai.googleModel : ai.openaiModel;
+  const selectedModel = ai.model;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -57,10 +58,10 @@ export default function StatusReportPage() {
     setShowNewForm(true);
 
     try {
-      const res = await fetch('/api/ai/status-report', {
+      const res = await apiFetch('/api/ai/status-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project, provider: ai.provider, model: selectedModel }),
+        body: JSON.stringify({ project, model: selectedModel }),
       });
 
       if (!res.ok) {

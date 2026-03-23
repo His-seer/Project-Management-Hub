@@ -2,28 +2,9 @@
 
 import { useState } from 'react';
 import { useAtlassianStore } from '@/stores/useAtlassianStore';
-import { useAiStore, ANTHROPIC_MODELS, GOOGLE_MODELS, OPENAI_MODELS } from '@/stores/useAiStore';
-import type { AiProvider } from '@/stores/useAiStore';
+import { useAiStore, GOOGLE_MODELS } from '@/stores/useAiStore';
 import { DataManagement } from '@/components/shared/DataManagement';
 import { Settings, Link2, Unlink, Bot } from 'lucide-react';
-
-const PROVIDER_LABELS: Record<AiProvider, string> = {
-  anthropic: 'Anthropic',
-  google: 'Google Gemini',
-  openai: 'OpenAI',
-};
-
-const PROVIDER_ENV_VARS: Record<AiProvider, string> = {
-  anthropic: 'ANTHROPIC_API_KEY',
-  google: 'GOOGLE_API_KEY',
-  openai: 'OPENAI_API_KEY',
-};
-
-const PROVIDER_MODELS: Record<AiProvider, { value: string; label: string }[]> = {
-  anthropic: ANTHROPIC_MODELS,
-  google: GOOGLE_MODELS,
-  openai: OPENAI_MODELS,
-};
 
 export default function SettingsPage() {
   const atlassian = useAtlassianStore();
@@ -36,13 +17,6 @@ export default function SettingsPage() {
   const handleSaveAtlassian = () => {
     atlassian.setCredentials(baseUrl, email, apiToken);
   };
-
-  const selectedModel =
-    ai.provider === 'anthropic'
-      ? ai.anthropicModel
-      : ai.provider === 'google'
-      ? ai.googleModel
-      : ai.openaiModel;
 
   return (
     <div className="p-8 max-w-4xl mx-auto w-full">
@@ -122,33 +96,15 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* AI Provider */}
+      {/* AI Model */}
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-6">
         <h2 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
           <Bot size={18} />
-          AI Provider
+          AI Model
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Choose which AI provider powers the AI features in this app. Preferences are saved
-          automatically.
+          Choose which Gemini model powers the AI features. Preferences are saved automatically.
         </p>
-
-        {/* Provider segmented control */}
-        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-4">
-          {(Object.keys(PROVIDER_LABELS) as AiProvider[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => ai.setProvider(p)}
-              className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-                ai.provider === p
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-              }`}
-            >
-              {PROVIDER_LABELS[p]}
-            </button>
-          ))}
-        </div>
 
         {/* Model dropdown */}
         <div className="mb-4">
@@ -156,11 +112,11 @@ export default function SettingsPage() {
             Model
           </label>
           <select
-            value={selectedModel}
-            onChange={(e) => ai.setModel(ai.provider, e.target.value)}
+            value={ai.model}
+            onChange={(e) => ai.setModel(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
           >
-            {PROVIDER_MODELS[ai.provider].map((m) => (
+            {GOOGLE_MODELS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
               </option>
@@ -173,11 +129,11 @@ export default function SettingsPage() {
           <p className="text-xs text-gray-600 dark:text-gray-400">
             Required env var:{' '}
             <code className="font-mono bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">
-              {PROVIDER_ENV_VARS[ai.provider]}
+              GOOGLE_API_KEY
             </code>
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-            Add your key to <code className="font-mono">.env.local</code> to enable this provider.
+            Add your key to <code className="font-mono">.env.local</code> or Vercel environment variables.
           </p>
         </div>
       </div>

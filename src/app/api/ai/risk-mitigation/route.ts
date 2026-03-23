@@ -1,18 +1,11 @@
 import { NextRequest } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { streamAiResponse } from '@/lib/aiClient';
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return Response.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 500 });
-  }
-
-  const { risk, projectName, projectDescription } = await req.json();
+  const { risk, projectName, projectDescription, model } = await req.json();
   if (!risk) {
     return Response.json({ error: 'Risk data is required' }, { status: 400 });
   }
-
-  const client = new Anthropic({ apiKey });
 
   const systemPrompt = `You are a senior risk management consultant. Given a project risk, suggest a practical mitigation strategy and contingency plan. Be specific, actionable, and concise. Return ONLY valid JSON.`;
 
@@ -38,23 +31,26 @@ Return ONLY a JSON object:
   "reasoning": "Brief explanation of why this approach was recommended (1-2 sentences)"
 }`;
 
+  const SSE_HEADERS = { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' };
+
   try {
-    const stream = client.messages.stream({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      thinking: { type: 'adaptive' },
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
+    const rawStream = await streamAiResponse({
+      model: model || 'gemini-2.5-flash',
+      systemPrompt,
+      userMessage: userPrompt,
     });
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of stream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`));
-            }
+          const reader = rawStream.getReader();
+          const decoder = new TextDecoder();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const text = decoder.decode(value, { stream: true });
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
@@ -66,12 +62,8 @@ Return ONLY a JSON object:
       },
     });
 
-    return new Response(readable, {
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
-    });
+    return new Response(readable, { headers: SSE_HEADERS });
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) return Response.json({ error: 'Invalid API key.' }, { status: 401 });
-    if (err instanceof Anthropic.RateLimitError) return Response.json({ error: 'Rate limit reached.' }, { status: 429 });
     return Response.json({ error: err instanceof Error ? err.message : 'Unknown error' }, { status: 500 });
   }
 }

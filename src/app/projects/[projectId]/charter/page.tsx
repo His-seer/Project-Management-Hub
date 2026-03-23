@@ -29,7 +29,7 @@ export default function CharterPage() {
   const projectId = useProjectId();
   const updateModule = useProjectStore((s) => s.updateModule);
   const ai = useAiStore();
-  const selectedModel = ai.provider === 'anthropic' ? ai.anthropicModel : ai.provider === 'google' ? ai.googleModel : ai.openaiModel;
+  const selectedModel = ai.model;
   const [exporting, setExporting] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export default function CharterPage() {
       const res = await fetch('/api/ai/charter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project, provider: ai.provider, model: selectedModel }),
+        body: JSON.stringify({ project, model: selectedModel }),
       });
       if (!res.ok) {
         const err = await res.json();

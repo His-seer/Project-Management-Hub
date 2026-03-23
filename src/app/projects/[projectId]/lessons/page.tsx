@@ -7,6 +7,7 @@ import { useAiStore } from '@/stores/useAiStore';
 import { EditableTable, type Column } from '@/components/shared/EditableTable';
 import type { LessonLearned } from '@/types';
 import { generateId } from '@/lib/ids';
+import apiFetch from '@/lib/apiFetch';
 import { Lightbulb, Sparkles } from 'lucide-react';
 
 const columns: Column<LessonLearned>[] = [
@@ -35,7 +36,7 @@ export default function LessonsPage() {
   const projectId = useProjectId();
   const updateModule = useProjectStore((s) => s.updateModule);
   const ai = useAiStore();
-  const selectedModel = ai.provider === 'anthropic' ? ai.anthropicModel : ai.provider === 'google' ? ai.googleModel : ai.openaiModel;
+  const selectedModel = ai.model;
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -46,10 +47,10 @@ export default function LessonsPage() {
     setAiError(null);
     let raw = '';
     try {
-      const res = await fetch('/api/ai/lessons', {
+      const res = await apiFetch('/api/ai/lessons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project, provider: ai.provider, model: selectedModel }),
+        body: JSON.stringify({ project, model: selectedModel }),
       });
       if (!res.ok) {
         const err = await res.json();
