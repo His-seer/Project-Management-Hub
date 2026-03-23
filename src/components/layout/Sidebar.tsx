@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUiStore } from '@/stores/useUiStore';
@@ -40,6 +41,8 @@ import {
   X,
   Workflow,
   GraduationCap,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
 const moduleGroups = [
@@ -103,6 +106,34 @@ export function Sidebar() {
   const projectIdx = pathParts.indexOf('projects');
   const currentProjectId = projectIdx >= 0 ? pathParts[projectIdx + 1] : null;
   const isProjectPage = currentProjectId && currentProjectId !== 'new';
+
+  // Determine which group contains the active page
+  const activeGroupLabel = useMemo(() => {
+    if (!isProjectPage || !currentProjectId) return null;
+    const currentSection = pathParts[pathParts.indexOf(currentProjectId) + 1] || '';
+    for (const group of moduleGroups) {
+      if (group.items.some((item) => item.href === currentSection)) return group.label;
+    }
+    return null;
+  }, [pathname, isProjectPage, currentProjectId, pathParts]);
+
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(activeGroupLabel ? [activeGroupLabel] : ['PLAN']));
+
+  const toggleGroup = (label: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
+
+  // Auto-expand the group containing the active page
+  useMemo(() => {
+    if (activeGroupLabel && !expandedGroups.has(activeGroupLabel)) {
+      setExpandedGroups((prev) => new Set([...prev, activeGroupLabel]));
+    }
+  }, [activeGroupLabel]);
 
   const handleNavClick = () => {
     closeMobileSidebar();
@@ -171,38 +202,56 @@ export function Sidebar() {
               </div>
             )}
 
-            {moduleGroups.map((group) => (
-              <div key={group.label} className="mb-3">
-                {!collapsed && (
-                  <div className="px-3 py-1 text-[10px] font-semibold text-slate-600 uppercase tracking-widest">
-                    {group.label}
-                  </div>
-                )}
-                {group.items.map((item) => {
-                  const fullHref = item.href
-                    ? `/projects/${currentProjectId}/${item.href}`
-                    : `/projects/${currentProjectId}`;
-                  const isActive = pathname === fullHref;
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={fullHref}
-                      onClick={handleNavClick}
-                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        isActive
-                          ? 'bg-indigo-500/20 text-indigo-300 font-medium'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+            {moduleGroups.map((group) => {
+              const isExpanded = expandedGroups.has(group.label);
+              const hasActiveItem = group.items.some((item) => {
+                const fullHref = item.href ? `/projects/${currentProjectId}/${item.href}` : `/projects/${currentProjectId}`;
+                return pathname === fullHref;
+              });
+              return (
+                <div key={group.label} className="mb-1">
+                  {!collapsed ? (
+                    <button
+                      onClick={() => toggleGroup(group.label)}
+                      className={`flex items-center justify-between w-full px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-widest transition-colors ${
+                        hasActiveItem ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
                       }`}
-                      title={collapsed ? item.label : undefined}
                     >
-                      <Icon size={15} />
-                      {!collapsed && item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+                      <span>{group.label}</span>
+                      {isExpanded
+                        ? <ChevronDown size={12} className="text-slate-600" />
+                        : <ChevronRight size={12} className="text-slate-600" />
+                      }
+                    </button>
+                  ) : (
+                    <div className="h-px bg-slate-700/50 mx-2 my-2" />
+                  )}
+                  {(isExpanded || collapsed) && group.items.map((item) => {
+                    const fullHref = item.href
+                      ? `/projects/${currentProjectId}/${item.href}`
+                      : `/projects/${currentProjectId}`;
+                    const isActive = pathname === fullHref;
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={fullHref}
+                        onClick={handleNavClick}
+                        className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                          isActive
+                            ? 'bg-indigo-500/20 text-indigo-300 font-medium'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                        }`}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <Icon size={15} />
+                        {!collapsed && item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              );
+            })}
 
             <div className="border-t border-slate-700/50 pt-2 mt-1">
               <Link

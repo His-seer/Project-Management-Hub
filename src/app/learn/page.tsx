@@ -199,10 +199,11 @@ export default function LearnPage() {
     finally { setAiSearchLoading(false); }
   };
 
-  const isSpecialTab = ['paths', 'youtube', 'ai-recs', 'bookmarks'].includes(activeCategory);
+  const isSpecialTab = ['paths', 'ai-recs', 'bookmarks'].includes(activeCategory);
   const filteredResources = RESOURCES.filter((r) => {
     if (isSpecialTab) return false;
-    if (activeCategory !== 'all' && r.category !== activeCategory) return false;
+    if (activeCategory !== 'all' && activeCategory !== 'youtube' && r.category !== activeCategory) return false;
+    if (activeCategory === 'youtube' && r.category !== 'youtube') return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -212,6 +213,14 @@ export default function LearnPage() {
         r.provider.toLowerCase().includes(q)
       );
     }
+    return true;
+  });
+
+  // Deduplicate by URL (some resources appear in multiple categories)
+  const seenUrls = new Set<string>();
+  const deduped = filteredResources.filter((r) => {
+    if (seenUrls.has(r.url)) return false;
+    seenUrls.add(r.url);
     return true;
   });
 
@@ -329,95 +338,7 @@ export default function LearnPage() {
         ))}
       </div>
 
-      {/* ── YouTube Search ── */}
-      {activeCategory === 'youtube' && (
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <div className="relative flex-1 max-w-lg">
-              <Youtube size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500" />
-              <input
-                type="text"
-                value={ytQuery}
-                onChange={(e) => setYtQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && searchYoutube()}
-                placeholder="Search PM videos... (e.g., risk management, agile scrum)"
-                className="field-input pl-9 w-full"
-              />
-            </div>
-            <button onClick={searchYoutube} disabled={ytLoading || !ytQuery.trim()} className="btn-primary disabled:opacity-50">
-              {ytLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-              Search
-            </button>
-          </div>
-
-          {/* Quick search chips */}
-          <div className="flex flex-wrap gap-1.5">
-            {['PMP exam prep', 'Scrum basics', 'Risk management', 'Earned value', 'Stakeholder engagement', 'Agile vs Waterfall', 'WBS tutorial', 'Critical path method'].map((term) => (
-              <button
-                key={term}
-                onClick={() => { setYtQuery(term); setYtLoading(true); apiFetch(`/api/youtube?q=${encodeURIComponent(term)}&max=8`).then(r => r.json()).then(d => setYtResults(d.results ?? [])).finally(() => setYtLoading(false)); }}
-                className="text-[10px] px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-              >
-                {term}
-              </button>
-            ))}
-          </div>
-
-          {ytResults.length === 0 && !ytLoading && (
-            <div className="pm-card p-8 text-center">
-              <Youtube size={32} className="mx-auto mb-2 text-red-300" />
-              <p className="text-sm text-slate-500">Search for project management videos to watch and learn.</p>
-              <p className="text-xs text-slate-400 mt-1">Videos play inline — no need to leave the page.</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {ytResults.map((v) => (
-              <div key={v.id} className="pm-card overflow-hidden group">
-                {ytPlayingId === v.id ? (
-                  <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                    <iframe
-                      className="absolute top-0 left-0 w-full h-full"
-                      src={`https://www.youtube.com/embed/${v.id}?autoplay=1`}
-                      title={v.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                ) : (
-                  <button onClick={() => setYtPlayingId(v.id)} className="relative w-full block" style={{ paddingBottom: '56.25%' }}>
-                    <img src={v.thumbnail} alt={v.title} className="absolute top-0 left-0 w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 flex items-center justify-center transition-colors">
-                      <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                        <Play size={20} fill="white" className="text-white ml-0.5" />
-                      </div>
-                    </div>
-                  </button>
-                )}
-                <div className="p-3">
-                  <h3 className="text-sm font-medium text-slate-900 dark:text-white line-clamp-2">{v.title}</h3>
-                  <p className="text-[10px] text-slate-400 mt-1">{v.channelTitle} · {new Date(v.publishedAt).toLocaleDateString()}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <a href={`https://www.youtube.com/watch?v=${v.id}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-slate-400 hover:text-red-500 flex items-center gap-1">
-                      <ExternalLink size={10} /> YouTube
-                    </a>
-                    <button
-                      onClick={() => bookmarkIds.has(v.id)
-                        ? removeBookmark(bookmarks.find(b => b.youtube_id === v.id)?.id ?? '', v.id)
-                        : addBookmark({ title: v.title, url: `https://www.youtube.com/watch?v=${v.id}`, youtubeId: v.id, description: v.description, provider: v.channelTitle, thumbnail: v.thumbnail })
-                      }
-                      className={`text-[10px] flex items-center gap-1 ${bookmarkIds.has(v.id) ? 'text-indigo-500' : 'text-slate-400 hover:text-indigo-500'}`}
-                    >
-                      {bookmarkIds.has(v.id) ? <BookmarkCheck size={10} /> : <Bookmark size={10} />}
-                      {bookmarkIds.has(v.id) ? 'Saved' : 'Save'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Video Search (inside youtube category tab) ── */}
 
       {/* ── AI Recommendations ── */}
       {activeCategory === 'ai-recs' && (
@@ -620,7 +541,7 @@ export default function LearnPage() {
       )}
 
       {/* Resource Grid */}
-      {activeCategory !== 'paths' && (
+      {!isSpecialTab && (
         <div>
           {activeCategory !== 'all' && (
             <div className="mb-4">
@@ -634,14 +555,99 @@ export default function LearnPage() {
             </div>
           )}
 
-          {filteredResources.length === 0 ? (
+          {/* YouTube search bar — shown inside the Video Learning category */}
+          {activeCategory === 'youtube' && (
+            <div className="space-y-3 mb-6">
+              <div className="flex gap-2">
+                <div className="relative flex-1 max-w-lg">
+                  <Youtube size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500" />
+                  <input
+                    type="text"
+                    value={ytQuery}
+                    onChange={(e) => setYtQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && searchYoutube()}
+                    placeholder="Search PM videos... (e.g., risk management, agile scrum)"
+                    className="field-input pl-9 w-full"
+                  />
+                </div>
+                <button onClick={searchYoutube} disabled={ytLoading || !ytQuery.trim()} className="btn-primary disabled:opacity-50">
+                  {ytLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  Search
+                </button>
+                {ytResults.length > 0 && (
+                  <button onClick={() => { setYtResults([]); setYtQuery(''); setYtPlayingId(null); }} className="btn-secondary">
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {['PMP exam prep', 'Scrum basics', 'Risk management', 'Earned value', 'Stakeholder engagement', 'Agile vs Waterfall', 'WBS tutorial', 'Critical path method'].map((term) => (
+                  <button
+                    key={term}
+                    onClick={() => { setYtQuery(term); setYtLoading(true); apiFetch(`/api/youtube?q=${encodeURIComponent(term)}&max=8`).then(r => r.json()).then(d => setYtResults(d.results ?? [])).finally(() => setYtLoading(false)); }}
+                    className="text-[10px] px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+
+              {/* YouTube search results */}
+              {ytResults.length > 0 && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{ytResults.length} results for &ldquo;{ytQuery}&rdquo;</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {ytResults.map((v) => (
+                      <div key={v.id} className="pm-card overflow-hidden group">
+                        {ytPlayingId === v.id ? (
+                          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                            <iframe className="absolute top-0 left-0 w-full h-full" src={`https://www.youtube.com/embed/${v.id}?autoplay=1`} title={v.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                          </div>
+                        ) : (
+                          <button onClick={() => setYtPlayingId(v.id)} className="relative w-full block" style={{ paddingBottom: '56.25%' }}>
+                            <img src={v.thumbnail} alt={v.title} className="absolute top-0 left-0 w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 flex items-center justify-center transition-colors">
+                              <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                <Play size={20} fill="white" className="text-white ml-0.5" />
+                              </div>
+                            </div>
+                          </button>
+                        )}
+                        <div className="p-3">
+                          <h3 className="text-sm font-medium text-slate-900 dark:text-white line-clamp-2">{v.title}</h3>
+                          <p className="text-[10px] text-slate-400 mt-1">{v.channelTitle} · {new Date(v.publishedAt).toLocaleDateString()}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <a href={`https://www.youtube.com/watch?v=${v.id}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-slate-400 hover:text-red-500 flex items-center gap-1"><ExternalLink size={10} /> YouTube</a>
+                            <button
+                              onClick={() => bookmarkIds.has(v.id) ? removeBookmark(bookmarks.find(b => b.youtube_id === v.id)?.id ?? '', v.id) : addBookmark({ title: v.title, url: `https://www.youtube.com/watch?v=${v.id}`, youtubeId: v.id, description: v.description, provider: v.channelTitle, thumbnail: v.thumbnail })}
+                              className={`text-[10px] flex items-center gap-1 ${bookmarkIds.has(v.id) ? 'text-indigo-500' : 'text-slate-400 hover:text-indigo-500'}`}
+                            >
+                              {bookmarkIds.has(v.id) ? <BookmarkCheck size={10} /> : <Bookmark size={10} />}
+                              {bookmarkIds.has(v.id) ? 'Saved' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Curated Video Channels</h3>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {deduped.length === 0 && ytResults.length === 0 ? (
             <div className="pm-card p-8 text-center">
               <Search size={32} className="mx-auto mb-2 text-slate-300" />
               <p className="text-sm text-slate-500">No resources found. Try a different search or category.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {filteredResources.map((res) => (
+              {deduped.map((res) => (
                 <ResourceCard key={res.id} resource={res} />
               ))}
             </div>

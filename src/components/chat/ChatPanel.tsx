@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ComponentPropsWithoutRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useChatStore } from '@/stores/useChatStore';
 import { useAiStore } from '@/stores/useAiStore';
 import { useUiStore } from '@/stores/useUiStore';
@@ -164,7 +165,38 @@ export default function ChatPanel() {
 
               {/* Message content */}
               {msg.content ? (
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                msg.role === 'user' ? (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                ) : (
+                  <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown
+                      components={{
+                        p: (props: ComponentPropsWithoutRef<'p'>) => <p className="mb-1.5 last:mb-0 leading-relaxed" {...props} />,
+                        ul: (props: ComponentPropsWithoutRef<'ul'>) => <ul className="mb-1.5 ml-4 list-disc space-y-0.5" {...props} />,
+                        ol: (props: ComponentPropsWithoutRef<'ol'>) => <ol className="mb-1.5 ml-4 list-decimal space-y-0.5" {...props} />,
+                        li: (props: ComponentPropsWithoutRef<'li'>) => <li className="leading-relaxed" {...props} />,
+                        strong: (props: ComponentPropsWithoutRef<'strong'>) => <strong className="font-semibold" {...props} />,
+                        code: ({ children, className, ...props }: ComponentPropsWithoutRef<'code'> & { className?: string }) => {
+                          const isBlock = className?.includes('language-');
+                          return isBlock ? (
+                            <code className="block bg-slate-800 text-slate-200 rounded-md p-2 my-1.5 text-[11px] overflow-x-auto" {...props}>{children}</code>
+                          ) : (
+                            <code className="bg-slate-200 dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 px-1 py-0.5 rounded text-[11px]" {...props}>{children}</code>
+                          );
+                        },
+                        h1: (props: ComponentPropsWithoutRef<'h1'>) => <h1 className="text-sm font-bold mb-1" {...props} />,
+                        h2: (props: ComponentPropsWithoutRef<'h2'>) => <h2 className="text-sm font-bold mb-1" {...props} />,
+                        h3: (props: ComponentPropsWithoutRef<'h3'>) => <h3 className="text-xs font-bold mb-1" {...props} />,
+                        blockquote: (props: ComponentPropsWithoutRef<'blockquote'>) => <blockquote className="border-l-2 border-indigo-400 pl-2 ml-1 italic text-slate-500 dark:text-slate-400" {...props} />,
+                        table: (props: ComponentPropsWithoutRef<'table'>) => <div className="overflow-x-auto my-1.5"><table className="text-[11px] border-collapse w-full" {...props} /></div>,
+                        th: (props: ComponentPropsWithoutRef<'th'>) => <th className="border border-slate-300 dark:border-slate-600 px-2 py-1 bg-slate-100 dark:bg-slate-800 text-left font-semibold" {...props} />,
+                        td: (props: ComponentPropsWithoutRef<'td'>) => <td className="border border-slate-300 dark:border-slate-600 px-2 py-1" {...props} />,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+                )
               ) : msg.role === 'assistant' && isStreaming ? (
                 <div className="flex items-center gap-1.5 text-slate-400">
                   <Loader2 size={14} className="animate-spin" />

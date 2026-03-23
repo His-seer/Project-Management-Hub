@@ -136,18 +136,6 @@ export const RESOURCES: LearningResource[] = [
     tags: ['capm', 'certification', 'official'],
   },
   {
-    id: 'capm-study-guide',
-    title: 'CAPM Exam Study Guide (Google PM Certificate)',
-    description: 'Google Project Management Professional Certificate on Coursera — qualifies for CAPM education hours.',
-    url: 'https://www.coursera.org/professional-certificates/google-project-management',
-    category: 'capm-prep',
-    provider: 'Google / Coursera',
-    type: 'course',
-    difficulty: 'beginner',
-    isFree: true,
-    tags: ['capm', 'google', 'coursera', 'education-hours'],
-  },
-  {
     id: 'capm-practice-questions',
     title: 'Free CAPM Practice Questions',
     description: 'Collection of free CAPM practice questions organized by knowledge area.',
@@ -312,8 +300,6 @@ export const RESOURCES: LearningResource[] = [
     difficulty: 'intermediate',
     isFree: true,
     tags: ['youtube', 'pmbok', 'leadership'],
-    youtubeId: 'GC7pN8Mjot8',
-    durationMinutes: 25,
   },
   {
     id: 'yt-project-management-videos',
@@ -421,7 +407,7 @@ export const LEARNING_PATHS: LearningPath[] = [
       {
         title: 'Meet the Requirements',
         description: 'Complete 23 hours of PM education. The Google PM Certificate qualifies.',
-        resourceIds: ['capm-study-guide', 'pmi-capm-overview'],
+        resourceIds: ['google-pm-cert', 'pmi-capm-overview'],
         estimatedHours: 23,
       },
       {
