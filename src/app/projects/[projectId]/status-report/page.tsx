@@ -10,6 +10,7 @@ import { overallCompleteness } from '@/lib/completeness';
 import { StatusReportPrint } from '@/components/print/StatusReportPrint';
 import { downloadAsPdf } from '@/lib/printExport';
 import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
 import {
   FileBarChart,
   Plus,
@@ -63,58 +64,27 @@ export default function StatusReportPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project, model: selectedModel }),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setAiError(data.error ?? 'Failed to generate report');
-        setAiGenerating(false);
-        return;
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullText = '';
-
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-            try {
-              const parsed = JSON.parse(line.slice(6));
-              if (parsed.error) { setAiError(parsed.error); break; }
-              if (parsed.text) { fullText += parsed.text; setAiProgress(fullText); }
-            } catch { /* skip malformed */ }
-          }
-        }
-      }
-
-      // Parse the generated JSON
-      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const generated = JSON.parse(jsonMatch[0]);
-        const today = new Date().toISOString().split('T')[0];
-        const weekStart = new Date(Date.now() - 6 * 86400000).toISOString().split('T')[0];
-        setNewReport({
-          reportDate: today,
-          reportingPeriod: `Week of ${weekStart} – ${today}`,
-          preparedBy: '',
-          overallStatus: generated.overallStatus ?? 'amber',
-          executiveSummary: generated.executiveSummary ?? '',
-          accomplishments: generated.accomplishments ?? [],
-          nextPeriodPlans: generated.nextPeriodPlans ?? [],
-          risks: generated.risks ?? '',
-          issues: generated.issues ?? '',
-          budgetStatus: generated.budgetStatus ?? '',
-          scheduleStatus: generated.scheduleStatus ?? '',
-          aiGenerated: true,
-        });
-        setAiProgress('');
-      } else {
-        setAiError('Could not parse AI response. Try again.');
-      }
+      const raw = await readSseStream(res, (chunk) => {
+        setAiProgress((prev) => prev + chunk);
+      });
+      const generated = parseAiJson<Record<string, unknown>>(raw);
+      const today = new Date().toISOString().split('T')[0];
+      const weekStart = new Date(Date.now() - 6 * 86400000).toISOString().split('T')[0];
+      setNewReport({
+        reportDate: today,
+        reportingPeriod: `Week of ${weekStart} – ${today}`,
+        preparedBy: '',
+        overallStatus: (generated.overallStatus as 'green' | 'amber' | 'red') ?? 'amber',
+        executiveSummary: (generated.executiveSummary as string) ?? '',
+        accomplishments: (generated.accomplishments as string[]) ?? [],
+        nextPeriodPlans: (generated.nextPeriodPlans as string[]) ?? [],
+        risks: (generated.risks as string) ?? '',
+        issues: (generated.issues as string) ?? '',
+        budgetStatus: (generated.budgetStatus as string) ?? '',
+        scheduleStatus: (generated.scheduleStatus as string) ?? '',
+        aiGenerated: true,
+      });
+      setAiProgress('');
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Network error');
     } finally {

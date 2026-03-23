@@ -6,6 +6,9 @@ import type { Meeting, MeetingDecision, MeetingActionItem } from '@/types';
 import { generateId } from '@/lib/ids';
 import { BookOpen, Plus, Trash2, X, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
+import { useAiStore } from '@/stores/useAiStore';
 
 interface AIExtractedData {
   decisions: { decision: string; madeBy: string }[];
@@ -19,6 +22,7 @@ export default function MeetingsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [aiExtractingMeetingId, setAiExtractingMeetingId] = useState<string | null>(null);
+  const selectedModel = useAiStore((s) => s.model);
   const [aiExtractedData, setAiExtractedData] = useState<AIExtractedData | null>(null);
   const [aiExtractError, setAiExtractError] = useState<string>('');
   const [checkedDecisions, setCheckedDecisions] = useState<Set<number>>(new Set());
@@ -61,42 +65,23 @@ export default function MeetingsPage() {
     setAiExtractedData(null);
     setAiExtractError('');
     try {
-      let raw = '';
-      const res = await fetch('/api/ai/extract-actions', {
+      const res = await apiFetch('/api/ai/extract-actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           notes: meeting.notes,
           attendees: meeting.attendees,
           title: meeting.title,
+          model: selectedModel,
         }),
       });
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') break;
-          const parsed = JSON.parse(payload);
-          if (parsed.error) throw new Error(parsed.error);
-          if (parsed.text) raw += parsed.text;
-        }
-      }
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) {
-        const data = JSON.parse(match[0]) as AIExtractedData;
-        setAiExtractedData(data);
-        setCheckedDecisions(new Set(data.decisions.map((_, i) => i)));
-        setCheckedActions(new Set(data.actionItems.map((_, i) => i)));
-      } else {
-        throw new Error('Could not parse AI response');
-      }
-    } catch (err: any) {
-      setAiExtractError(err.message || 'Failed to extract actions');
+      const raw = await readSseStream(res);
+      const data = parseAiJson<AIExtractedData>(raw);
+      setAiExtractedData(data);
+      setCheckedDecisions(new Set(data.decisions.map((_, i) => i)));
+      setCheckedActions(new Set(data.actionItems.map((_, i) => i)));
+    } catch (err: unknown) {
+      setAiExtractError(err instanceof Error ? err.message : 'Failed to extract actions');
     }
   };
 

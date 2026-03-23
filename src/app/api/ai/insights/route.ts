@@ -1,13 +1,8 @@
 import { NextRequest } from 'next/server';
-import { streamAiResponse } from '@/lib/aiClient';
+import { streamAndRespond } from '@/lib/aiUtils';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const {
-    project,
-    model,
-  }: { project: unknown; model?: string } = body;
-
+  const { project, model }: { project: unknown; model?: string } = await req.json();
   if (!project) return Response.json({ error: 'Project data is required' }, { status: 400 });
 
   const proj = project as {
@@ -25,24 +20,18 @@ export async function POST(req: NextRequest) {
   };
 
   const openRisks = (proj.risks ?? []).filter((r) => r.status !== 'closed');
-  const openIssues = (proj.issues ?? []).filter(
-    (i) => i.status !== 'closed' && i.status !== 'resolved'
-  );
+  const openIssues = (proj.issues ?? []).filter((i) => i.status !== 'closed' && i.status !== 'resolved');
   const overdueActions = (proj.actionItems ?? []).filter(
-    (a) =>
-      (a.status === 'open' || a.status === 'in-progress') &&
-      a.dueDate &&
-      new Date(a.dueDate) < new Date()
+    (a) => (a.status === 'open' || a.status === 'in-progress') && a.dueDate && new Date(a.dueDate) < new Date()
   );
   const missedMilestones = (proj.plan?.milestones ?? []).filter(
-    (m) =>
-      m.status === 'missed' ||
-      (m.dueDate && new Date(m.dueDate) < new Date() && m.status !== 'completed')
+    (m) => m.status === 'missed' || (m.dueDate && new Date(m.dueDate) < new Date() && m.status !== 'completed')
   );
 
-  const systemPrompt = `You are a senior PM advisor. Analyze project data and provide predictive insights — things the PM might not notice. Focus on patterns, risks, and actionable recommendations. Return ONLY valid JSON.`;
-
-  const userPrompt = `Analyze this project and provide up to 5 key insights:
+  return streamAndRespond({
+    model: model || 'gemini-2.5-flash',
+    systemPrompt: `You are a senior PM advisor. Analyze project data and provide predictive insights — things the PM might not notice. Focus on patterns, risks, and actionable recommendations. Return ONLY valid JSON.`,
+    userMessage: `Analyze this project and provide up to 5 key insights:
 
 PROJECT: ${proj.meta.name}
 STATUS: ${proj.meta.status} | HEALTH: ${proj.meta.health}
@@ -68,53 +57,6 @@ Return ONLY a JSON object:
   ]
 }
 
-Return 3-5 insights. Prioritize warnings, then suggestions, then positives. Only include genuinely useful observations — no padding.`;
-
-  const SSE_HEADERS = {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-  };
-
-  try {
-    const rawStream = await streamAiResponse({
-      model: model || 'gemini-2.5-flash',
-      systemPrompt,
-      userMessage: userPrompt,
-    });
-
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          const reader = rawStream.getReader();
-          const decoder = new TextDecoder();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-            );
-          }
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
-        } catch (err) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Stream error' })}\n\n`
-            )
-          );
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(readable, { headers: SSE_HEADERS });
-  } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+Return 3-5 insights. Prioritize warnings, then suggestions, then positives. Only include genuinely useful observations — no padding.`,
+  });
 }

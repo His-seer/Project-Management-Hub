@@ -1,7 +1,8 @@
 'use client';
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { safeStorage } from '@/lib/safeStorage';
 
 interface AtlassianStore {
   baseUrl: string;
@@ -26,7 +27,7 @@ export const useAtlassianStore = create<AtlassianStore>()(
     }),
     {
       name: 'pm-app-atlassian',
-      storage: createJSONStorage(() => localStorage),
+      storage: safeStorage,
     }
   )
 );

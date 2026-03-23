@@ -7,6 +7,9 @@ import type { ChangeData, ChangeLogEntry, ChangeRequest } from '@/types';
 import { generateId } from '@/lib/ids';
 import { GitBranch, AlertTriangle, Sparkles, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
+import { useAiStore } from '@/stores/useAiStore';
 
 const logColumns: Column<ChangeLogEntry>[] = [
   { key: 'version', label: 'Version', width: '12%' },
@@ -92,6 +95,7 @@ export default function ChangesPage() {
   const [tab, setTab] = useState<'log' | 'requests'>('log');
 
   // AI Change Impact Assessment state
+  const selectedModel = useAiStore((s) => s.model);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
   const [aiTargetCrId, setAiTargetCrId] = useState<string | null>(null);
@@ -141,30 +145,13 @@ export default function ChangesPage() {
     setAiError(null);
 
     try {
-      let raw = '';
-      const res = await fetch('/api/ai/change-impact', {
+      const res = await apiFetch('/api/ai/change-impact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ changeRequest: pendingCr, project }),
+        body: JSON.stringify({ changeRequest: pendingCr, project, model: selectedModel }),
       });
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') break;
-          const parsed = JSON.parse(payload);
-          if (parsed.error) throw new Error(parsed.error);
-          if (parsed.text) raw += parsed.text;
-        }
-      }
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      const result = JSON.parse(jsonMatch![0]) as AiSuggestion;
-      setAiSuggestion(result);
+      const raw = await readSseStream(res);
+      setAiSuggestion(parseAiJson<AiSuggestion>(raw));
     } catch (err: unknown) {
       setAiError(err instanceof Error ? err.message : 'AI assessment failed.');
     } finally {

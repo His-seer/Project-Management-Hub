@@ -1,13 +1,9 @@
 import { NextRequest } from 'next/server';
-import { streamAiResponse } from '@/lib/aiClient';
+import { streamAndRespond } from '@/lib/aiUtils';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { project, model }: { project: any; model?: string } = body;
-
-  if (!project) {
-    return Response.json({ error: 'Project data is required' }, { status: 400 });
-  }
+  const { project, model }: { project: any; model?: string } = await req.json();
+  if (!project) return Response.json({ error: 'Project data is required' }, { status: 400 });
 
   const closedRisks = (project.risks ?? []).filter((r: { status: string }) => r.status === 'closed' || r.status === 'accepted');
   const resolvedIssues = (project.issues ?? []).filter((i: { status: string }) => i.status === 'resolved' || i.status === 'closed');
@@ -46,12 +42,13 @@ ${acceptedChanges.slice(0, 5).map((c: { name: string; reason: string; durationIm
 ).join('\n') || 'None'}
   `.trim();
 
-  const systemPrompt = `You are a senior Project Manager extracting lessons learned from project data.
+  return streamAndRespond({
+    model: model || 'gemini-2.5-flash',
+    systemPrompt: `You are a senior Project Manager extracting lessons learned from project data.
 Your lessons are specific, actionable, and help future projects avoid the same problems.
 Be honest about what went wrong and concrete about recommendations.
-Format your response as valid JSON matching the exact schema provided.`;
-
-  const userPrompt = `Analyse the project data below and generate a set of lessons learned.
+Format your response as valid JSON matching the exact schema provided.`,
+    userMessage: `Analyse the project data below and generate a set of lessons learned.
 Return ONLY a valid JSON array of lesson objects with this exact structure:
 [
   {
@@ -66,53 +63,6 @@ Return ONLY a valid JSON array of lesson objects with this exact structure:
 Generate 4-6 lessons covering different categories and phases. Base them on the actual evidence in the project data (risks, issues, missed milestones, assumption failures, change requests).
 
 PROJECT DATA:
-${context}`;
-
-  const SSE_HEADERS = {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-  };
-
-  try {
-    const rawStream = await streamAiResponse({
-      model: model || 'gemini-2.5-flash',
-      systemPrompt,
-      userMessage: userPrompt,
-    });
-
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          const reader = rawStream.getReader();
-          const decoder = new TextDecoder();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-            );
-          }
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
-        } catch (err) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Stream error' })}\n\n`
-            )
-          );
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(readable, { headers: SSE_HEADERS });
-  } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+${context}`,
+  });
 }

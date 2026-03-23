@@ -7,6 +7,9 @@ import { EditableTable, type Column } from '@/components/shared/EditableTable';
 import type { Stakeholder } from '@/types';
 import { generateId } from '@/lib/ids';
 import { UserCheck, Sparkles, X } from 'lucide-react';
+import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
+import { useAiStore } from '@/stores/useAiStore';
 
 const columns: Column<Stakeholder>[] = [
   { key: 'name', label: 'Name', width: '13%' },
@@ -56,6 +59,7 @@ export default function StakeholdersPage() {
   const projectId = useProjectId();
   const updateModule = useProjectStore((s) => s.updateModule);
 
+  const selectedModel = useAiStore((s) => s.model);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[] | null>(null);
   const [aiError, setAiError] = useState<string>('');
@@ -78,39 +82,20 @@ export default function StakeholdersPage() {
     setAiError('');
     setAiRecommendations(null);
     try {
-      let raw = '';
-      const res = await fetch('/api/ai/stakeholder-strategy', {
+      const res = await apiFetch('/api/ai/stakeholder-strategy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stakeholders: project.stakeholders,
           projectName: project.meta.name,
           projectDescription: project.meta.description,
+          model: selectedModel,
         }),
       });
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') break;
-          const parsed = JSON.parse(payload);
-          if (parsed.error) throw new Error(parsed.error);
-          if (parsed.text) raw += parsed.text;
-        }
-      }
-      const match = raw.match(/\[[\s\S]*\]/);
-      if (match) {
-        setAiRecommendations(JSON.parse(match[0]));
-      } else {
-        throw new Error('Could not parse AI response');
-      }
-    } catch (err: any) {
-      setAiError(err.message || 'Failed to generate engagement plan');
+      const raw = await readSseStream(res);
+      setAiRecommendations(parseAiJson<AIRecommendation[]>(raw));
+    } catch (err: unknown) {
+      setAiError(err instanceof Error ? err.message : 'Failed to generate engagement plan');
     } finally {
       setAiGenerating(false);
     }

@@ -8,6 +8,9 @@ import { generateId } from '@/lib/ids';
 import { AlertTriangle, Printer, Sparkles, Check, Pencil, X } from 'lucide-react';
 import { RiskRegisterPrint } from '@/components/print/RiskRegisterPrint';
 import { useState } from 'react';
+import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
+import { useAiStore } from '@/stores/useAiStore';
 import { downloadAsPdf } from '@/lib/printExport';
 
 const columns: Column<Risk>[] = [
@@ -73,6 +76,7 @@ export default function RiskRegisterPage() {
   const updateModule = useProjectStore((s) => s.updateModule);
   const [exporting, setExporting] = useState(false);
 
+  const selectedModel = useAiStore((s) => s.model);
   // AI suggestion state
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
@@ -106,34 +110,18 @@ export default function RiskRegisterPage() {
     setAiEditValues(null);
 
     try {
-      let raw = '';
-      const res = await fetch('/api/ai/risk-mitigation', {
+      const res = await apiFetch('/api/ai/risk-mitigation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           risk: targetRisk,
           projectName: project.meta.name,
           projectDescription: project.meta.description,
+          model: selectedModel,
         }),
       });
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') break;
-          const parsed = JSON.parse(payload);
-          if (parsed.error) throw new Error(parsed.error);
-          if (parsed.text) raw += parsed.text;
-        }
-      }
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      const result = JSON.parse(jsonMatch![0]) as AiSuggestion;
-      setAiSuggestion(result);
+      const raw = await readSseStream(res);
+      setAiSuggestion(parseAiJson<AiSuggestion>(raw));
     } catch (err: unknown) {
       setAiError(err instanceof Error ? err.message : 'Failed to generate suggestion.');
     } finally {

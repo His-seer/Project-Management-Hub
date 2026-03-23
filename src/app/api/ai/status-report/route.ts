@@ -1,13 +1,9 @@
 import { NextRequest } from 'next/server';
-import { streamAiResponse } from '@/lib/aiClient';
+import { streamAndRespond } from '@/lib/aiUtils';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { project, model }: { project: any; model?: string } = body;
-
-  if (!project) {
-    return Response.json({ error: 'Project data is required' }, { status: 400 });
-  }
+  const { project, model }: { project: any; model?: string } = await req.json();
+  if (!project) return Response.json({ error: 'Project data is required' }, { status: 400 });
 
   const openRisks = (project.risks ?? []).filter((r: { status: string }) => r.status === 'open' || r.status === 'mitigating');
   const highRisks = openRisks.filter((r: { severity: number }) => r.severity >= 12);
@@ -55,12 +51,13 @@ Open Actions: ${m.actionItems?.filter((a) => a.status !== 'done').map((a) => `${
 `).join('\n')}
   `.trim();
 
-  const systemPrompt = `You are an expert Project Manager generating a concise, professional weekly status report.
+  return streamAndRespond({
+    model: model || 'gemini-2.5-flash',
+    systemPrompt: `You are an expert Project Manager generating a concise, professional weekly status report.
 Your reports are clear, factual, action-oriented, and suitable for executive stakeholders.
 Write in a direct, professional tone. Avoid fluff. Be specific about numbers, dates, and names where available.
-Format your response as valid JSON matching the exact schema provided.`;
-
-  const userPrompt = `Generate a weekly project status report for the project data below.
+Format your response as valid JSON matching the exact schema provided.`,
+    userMessage: `Generate a weekly project status report for the project data below.
 Return ONLY a valid JSON object with this exact structure:
 {
   "overallStatus": "green" | "amber" | "red",
@@ -74,53 +71,6 @@ Return ONLY a valid JSON object with this exact structure:
 }
 
 PROJECT DATA:
-${context}`;
-
-  const SSE_HEADERS = {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-  };
-
-  try {
-    const rawStream = await streamAiResponse({
-      model: model || 'gemini-2.5-flash',
-      systemPrompt,
-      userMessage: userPrompt,
-    });
-
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          const reader = rawStream.getReader();
-          const decoder = new TextDecoder();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-            );
-          }
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
-        } catch (err) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Stream error' })}\n\n`
-            )
-          );
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(readable, { headers: SSE_HEADERS });
-  } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+${context}`,
+  });
 }

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useCurrentProject, useProjectId } from '@/hooks/useCurrentProject';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { calculateCompleteness, overallCompleteness } from '@/lib/completeness';
+import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
+import { useAiStore } from '@/stores/useAiStore';
 import {
   AlertTriangle,
   AlertCircle,
@@ -73,6 +76,7 @@ export default function ProjectOverview() {
   // Hook must be called before any early returns (React rules of hooks)
   const { contentRef, exporting, exportPdf, captureImage } = useScreenshotExport('Project Overview');
 
+  const selectedModel = useAiStore((s) => s.model);
   const [aiInsights, setAiInsights] = useState<Array<{ id: string; type: 'warning' | 'suggestion' | 'positive'; title: string; detail: string; module: string }>>([]);
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
   const [aiInsightsError, setAiInsightsError] = useState<string>('');
@@ -84,41 +88,23 @@ export default function ProjectOverview() {
     setAiInsightsLoading(true);
     setAiInsightsError('');
     try {
-      let raw = '';
-      const res = await fetch('/api/ai/insights', {
+      const res = await apiFetch('/api/ai/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project }),
+        body: JSON.stringify({ project, model: selectedModel }),
       });
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') break;
-          const parsed = JSON.parse(payload);
-          if (parsed.error) throw new Error(parsed.error);
-          if (parsed.text) raw += parsed.text;
-        }
-      }
-      const match = raw.match(/\[[\s\S]*\]/);
-      if (match) {
-        setAiInsights(JSON.parse(match[0]));
-        setInsightsDismissed(new Set());
-        setInsightsExpanded(true);
-      } else {
-        throw new Error('Could not parse AI response');
-      }
-    } catch (err: any) {
-      setAiInsightsError(err.message || 'Failed to fetch insights');
+      const raw = await readSseStream(res);
+      const parsed = parseAiJson<{ insights: typeof aiInsights } | typeof aiInsights>(raw);
+      const insights = Array.isArray(parsed) ? parsed : parsed.insights;
+      setAiInsights(insights);
+      setInsightsDismissed(new Set());
+      setInsightsExpanded(true);
+    } catch (err: unknown) {
+      setAiInsightsError(err instanceof Error ? err.message : 'Failed to fetch insights');
     } finally {
       setAiInsightsLoading(false);
     }
-  }, [project]);
+  }, [project, selectedModel]);
 
   if (!project) return null;
 

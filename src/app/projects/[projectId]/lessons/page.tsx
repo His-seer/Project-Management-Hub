@@ -8,6 +8,7 @@ import { EditableTable, type Column } from '@/components/shared/EditableTable';
 import type { LessonLearned } from '@/types';
 import { generateId } from '@/lib/ids';
 import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
 import { Lightbulb, Sparkles } from 'lucide-react';
 
 const columns: Column<LessonLearned>[] = [
@@ -45,44 +46,20 @@ export default function LessonsPage() {
   const handleAiGenerate = async () => {
     setAiGenerating(true);
     setAiError(null);
-    let raw = '';
     try {
       const res = await apiFetch('/api/ai/lessons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project, model: selectedModel }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? 'Request failed');
-      }
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') break;
-          try {
-            const { text, error } = JSON.parse(payload);
-            if (error) throw new Error(error);
-            if (text) raw += text;
-          } catch {}
-        }
-      }
-      const jsonMatch = raw.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error('No valid JSON array in response');
-      const generated: Omit<LessonLearned, 'id'>[] = JSON.parse(jsonMatch[0]);
+      const raw = await readSseStream(res);
+      const generated = parseAiJson<Omit<LessonLearned, 'id'>[]>(raw);
       const today = new Date().toISOString().split('T')[0];
       const withIds: LessonLearned[] = generated.map((l) => ({
         ...l,
         id: generateId(),
         date: today,
       }));
-      // Append to existing lessons (don't overwrite manual ones)
       updateModule(projectId, 'lessons', [...project.lessons, ...withIds]);
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Unknown error');

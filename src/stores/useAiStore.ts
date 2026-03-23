@@ -1,6 +1,7 @@
 'use client';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { safeStorage } from '@/lib/safeStorage';
 
 export const GOOGLE_MODELS = [
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Most capable)' },
@@ -25,7 +26,7 @@ export const useAiStore = create<AiStore>()(
     }),
     {
       name: 'pm-app-ai-config',
-      storage: createJSONStorage(() => localStorage),
+      storage: safeStorage,
     }
   )
 );

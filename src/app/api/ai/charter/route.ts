@@ -1,13 +1,9 @@
 import { NextRequest } from 'next/server';
-import { streamAiResponse } from '@/lib/aiClient';
+import { streamAndRespond } from '@/lib/aiUtils';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { project, model }: { project: any; model?: string } = body;
-
-  if (!project) {
-    return Response.json({ error: 'Project data is required' }, { status: 400 });
-  }
+  const { project, model }: { project: any; model?: string } = await req.json();
+  if (!project) return Response.json({ error: 'Project data is required' }, { status: 400 });
 
   const context = `
 PROJECT NAME: ${project.meta.name}
@@ -30,12 +26,13 @@ STAKEHOLDERS:
 ${(project.stakeholders ?? []).map((s: { name: string; role: string }) => `- ${s.name} (${s.role})`).join('\n') || 'None'}
   `.trim();
 
-  const systemPrompt = `You are an expert Project Manager writing a professional project charter.
+  return streamAndRespond({
+    model: model || 'gemini-2.5-flash',
+    systemPrompt: `You are an expert Project Manager writing a professional project charter.
 Your charters are clear, strategic, and suitable for executive approval.
 Be specific and actionable. Infer reasonable details from the project context.
-Format your response as valid JSON matching the exact schema provided.`;
-
-  const userPrompt = `Generate a comprehensive project charter based on the project data below.
+Format your response as valid JSON matching the exact schema provided.`,
+    userMessage: `Generate a comprehensive project charter based on the project data below.
 Return ONLY a valid JSON object with this exact structure:
 {
   "executiveSummary": "2-3 sentence paragraph summarising the project, its purpose, and expected outcome",
@@ -53,53 +50,6 @@ Return ONLY a valid JSON object with this exact structure:
 }
 
 PROJECT DATA:
-${context}`;
-
-  const SSE_HEADERS = {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-  };
-
-  try {
-    const rawStream = await streamAiResponse({
-      model: model || 'gemini-2.5-flash',
-      systemPrompt,
-      userMessage: userPrompt,
-    });
-
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          const reader = rawStream.getReader();
-          const decoder = new TextDecoder();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-            );
-          }
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-          controller.close();
-        } catch (err) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ error: err instanceof Error ? err.message : 'Stream error' })}\n\n`
-            )
-          );
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(readable, { headers: SSE_HEADERS });
-  } catch (err) {
-    return Response.json(
-      { error: err instanceof Error ? err.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+${context}`,
+  });
 }

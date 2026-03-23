@@ -3,6 +3,11 @@ import { useUiStore } from '@/stores/useUiStore';
 import { BarChart3, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { ToastProvider } from '@/components/shared/Toast';
+import dynamic from 'next/dynamic';
+
+const ChatPanel = dynamic(() => import('@/components/chat/ChatPanel'), { ssr: false });
+const ChatToggle = dynamic(() => import('@/components/chat/ChatToggle'), { ssr: false });
+const NotificationCenter = dynamic(() => import('@/components/notifications/NotificationCenter'), { ssr: false });
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed, openMobileSidebar } = useUiStore();
@@ -34,6 +39,9 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       >
         {children}
       </main>
+      <ChatPanel />
+      <ChatToggle />
+      <NotificationCenter />
     </ToastProvider>
   );
 }

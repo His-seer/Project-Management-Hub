@@ -38,64 +38,57 @@ import {
   FlaskConical,
   FileBarChart,
   X,
+  Workflow,
+  GraduationCap,
 } from 'lucide-react';
 
 const moduleGroups = [
   {
-    label: 'PLANNING',
+    label: 'PLAN',
     items: [
+      { href: '', label: 'Dashboard', icon: LayoutDashboard },
       { href: 'charter', label: 'Charter', icon: FileText },
       { href: 'plan', label: 'Project Plan', icon: FolderKanban },
       { href: 'gantt', label: 'Gantt Chart', icon: GanttChart },
       { href: 'wbs', label: 'WBS', icon: Network },
-      { href: 'estimates', label: 'Estimates', icon: DollarSign },
       { href: 'roadmap', label: 'Roadmap', icon: Map },
+      { href: 'estimates', label: 'Estimates', icon: DollarSign },
       { href: 'assumptions', label: 'Assumptions', icon: FlaskConical },
     ],
   },
   {
-    label: 'PEOPLE',
+    label: 'EXECUTE',
     items: [
       { href: 'raci', label: 'RACI Matrix', icon: Grid3X3 },
       { href: 'stakeholders', label: 'Stakeholders', icon: UserCheck },
       { href: 'resources', label: 'Resources', icon: Users },
-      { href: 'communications', label: 'Comms Plan', icon: MessageSquare },
-    ],
-  },
-  {
-    label: 'EXECUTION',
-    items: [
-      { href: 'jira', label: 'Jira Hub', icon: FolderKanban },
-      { href: 'issues', label: 'Issue Tracker', icon: AlertCircle },
       { href: 'actions', label: 'Action Items', icon: CheckSquare },
       { href: 'meetings', label: 'Meetings', icon: BookOpen },
       { href: 'decisions', label: 'Decision Log', icon: ClipboardList },
+      { href: 'communications', label: 'Comms Plan', icon: MessageSquare },
+      { href: 'jira', label: 'Jira Hub', icon: FolderKanban },
     ],
   },
   {
-    label: 'MONITORING',
+    label: 'MONITOR',
     items: [
-      { href: '', label: 'Dashboard', icon: LayoutDashboard },
-      { href: 'kpi', label: 'KPI Dashboard', icon: BarChart3 },
-      { href: 'risks', label: 'Risk Register', icon: AlertTriangle },
+      { href: 'kpi', label: 'KPIs', icon: BarChart3 },
+      { href: 'risks', label: 'Risks', icon: AlertTriangle },
+      { href: 'issues', label: 'Issues', icon: AlertCircle },
       { href: 'changes', label: 'Changes', icon: GitBranch },
       { href: 'status-report', label: 'Status Report', icon: FileBarChart },
       { href: 'baselines', label: 'Baselines', icon: Bookmark },
-    ],
-  },
-  {
-    label: 'GOVERNANCE',
-    items: [
       { href: 'governance', label: 'Governance', icon: Shield },
       { href: 'funding', label: 'Funding', icon: Wallet },
-      { href: 'lessons', label: 'Lessons Learned', icon: Lightbulb },
+      { href: 'lessons', label: 'Lessons', icon: Lightbulb },
     ],
   },
   {
-    label: 'DOCS',
+    label: 'AUTOMATE',
     items: [
-      { href: 'confluence', label: 'Confluence Hub', icon: BookOpen },
-      { href: 'history', label: 'Change History', icon: History },
+      { href: 'workflows', label: 'Workflows', icon: Workflow },
+      { href: 'confluence', label: 'Confluence', icon: BookOpen },
+      { href: 'history', label: 'History', icon: History },
     ],
   },
 ];
@@ -279,6 +272,14 @@ export function Sidebar() {
             >
               {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
+            <Link
+              href="/learn"
+              onClick={handleNavClick}
+              className={`p-2 rounded-md hover:bg-slate-800 transition-colors ${pathname === '/learn' ? 'text-indigo-300' : 'text-slate-400 hover:text-slate-200'}`}
+              title="PM Learning Hub"
+            >
+              <GraduationCap size={16} />
+            </Link>
             <Link
               href="/settings"
               onClick={handleNavClick}

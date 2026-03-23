@@ -4,6 +4,8 @@ import { useCurrentProject, useProjectId } from '@/hooks/useCurrentProject';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useAiStore } from '@/stores/useAiStore';
 import type { Charter, CharterApproval } from '@/types';
+import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
 import {
   FileText,
   Plus,
@@ -50,37 +52,14 @@ export default function CharterPage() {
   const handleAiGenerate = async () => {
     setAiGenerating(true);
     setAiError(null);
-    let raw = '';
     try {
-      const res = await fetch('/api/ai/charter', {
+      const res = await apiFetch('/api/ai/charter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project, model: selectedModel }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? 'Request failed');
-      }
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') break;
-          try {
-            const { text, error } = JSON.parse(payload);
-            if (error) throw new Error(error);
-            if (text) raw += text;
-          } catch {}
-        }
-      }
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('No valid JSON in response');
-      const generated = JSON.parse(jsonMatch[0]);
+      const raw = await readSseStream(res);
+      const generated = parseAiJson<Partial<Charter>>(raw);
       update(generated);
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Unknown error');
