@@ -66,7 +66,7 @@ Include 4-6 realistic roles. Be specific to the project type, not generic.`,
   const selectedPrompt = systemPrompts[mode || 'full'];
 
   return streamAndRespond({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     systemPrompt: selectedPrompt,
     userMessage: `Project information:\n${prompt}`,
   });
