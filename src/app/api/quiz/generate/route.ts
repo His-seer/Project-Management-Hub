@@ -46,14 +46,24 @@ Return ONLY a JSON array with this EXACT structure:
   {
     "id": "gen_1",
     "question": "The full question text",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correctIndex": 0,
+    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+    "correctIndex": 2,
     "explanation": "Why the correct answer is right and why others are wrong (2-3 sentences)",
     "topic": "one of: ${topicList}",
     "certification": "one of: ${certList}",
     "difficulty": "one of: ${diffList}"
   }
 ]
+
+CRITICAL RULES FOR correctIndex:
+- correctIndex is the 0-based position of the correct answer in the options array (0=A, 1=B, 2=C, 3=D)
+- You MUST distribute correct answers RANDOMLY and UNPREDICTABLY across all positions
+- Target distribution: approximately 25% for each of 0, 1, 2, 3 — but in a shuffled, non-repeating pattern
+- FORBIDDEN patterns: sequential (0,1,2,3,0,1,2,3), all-same (0,0,0,0), or any predictable cycle
+- NEVER use the same correctIndex more than 2 times in a row
+- A student must NOT be able to guess the answer by looking at position patterns alone
+- Treat it like a shuffled deck: spread answers across A, B, C, D unpredictably
+- Double-check: the text at options[correctIndex] must always be the factually correct answer
 
 IMPORTANT: Generate EXACTLY ${count} questions. Number the ids sequentially: gen_1, gen_2, etc.
 Distribute questions evenly across the requested topics.`,
