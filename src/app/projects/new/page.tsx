@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import { newProjectTourSteps, TOUR_KEYS } from '@/lib/tours';
+const TourStarter = dynamic(() => import('@/components/tour/TourStarter').then((m) => ({ default: m.TourStarter })), { ssr: false });
 import { useRouter } from 'next/navigation';
 import { useProjectStore } from '@/stores/useProjectStore';
 import apiFetch from '@/lib/apiFetch';
@@ -278,6 +281,7 @@ export default function NewProjectWizard() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col min-h-screen">
+      <TourStarter steps={newProjectTourSteps} tourKey={TOUR_KEYS.NEW_PROJECT} />
       <div className="flex-1 overflow-y-auto p-8 max-w-3xl mx-auto w-full">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Create New Project</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
@@ -285,7 +289,7 @@ export default function NewProjectWizard() {
         </p>
 
         {/* Stepper */}
-        <div className="flex items-center gap-1 mb-8 flex-wrap">
+        <div className="flex items-center gap-1 mb-8 flex-wrap" data-tour="wizard-steps">
           {steps.map((s, i) => (
             <div key={s} className="flex items-center">
               <div
@@ -319,7 +323,7 @@ export default function NewProjectWizard() {
 
           {/* ── STEP 0: AI Quick Start ── */}
           {step === 0 && (
-            <div className="space-y-5">
+            <div className="space-y-5" data-tour="ai-quickstart">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0">
                   <Wand2 className="text-purple-600 dark:text-purple-400" size={20} />

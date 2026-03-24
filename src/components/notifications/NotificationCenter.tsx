@@ -82,6 +82,7 @@ export default function NotificationCenter() {
       {/* Bell button */}
       <button
         onClick={() => { setOpen(!open); if (!open) markAllRead(projectId); }}
+        data-tour="notification-btn"
         className="fixed bottom-6 right-20 z-40 p-3 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
         title="Notifications"
       >

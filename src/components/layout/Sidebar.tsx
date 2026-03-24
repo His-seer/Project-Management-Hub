@@ -43,6 +43,7 @@ import {
   GraduationCap,
   ChevronDown,
   ChevronRight,
+  HelpCircle,
 } from 'lucide-react';
 
 const moduleGroups = [
@@ -167,7 +168,7 @@ export function Sidebar() {
       </div>
 
       {/* Portfolio + New Project */}
-      <div className="px-2 pt-3 pb-2 border-b border-slate-700/50 flex-shrink-0">
+      <div className="px-2 pt-3 pb-2 border-b border-slate-700/50 flex-shrink-0" data-tour="sidebar">
         <Link
           href="/"
           onClick={handleNavClick}
@@ -184,6 +185,7 @@ export function Sidebar() {
         <Link
           href="/projects/new"
           onClick={handleNavClick}
+          data-tour="new-project-btn"
           className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
           title={collapsed ? 'New Project' : undefined}
         >
@@ -324,6 +326,7 @@ export function Sidebar() {
             <Link
               href="/learn"
               onClick={handleNavClick}
+              data-tour="learning-link"
               className={`p-2 rounded-md hover:bg-slate-800 transition-colors ${pathname === '/learn' ? 'text-indigo-300' : 'text-slate-400 hover:text-slate-200'}`}
               title="PM Learning Hub"
             >
@@ -336,6 +339,16 @@ export function Sidebar() {
             >
               <Settings size={16} />
             </Link>
+            <button
+              onClick={() => {
+                const fn = (window as Window & { __startPageTour?: () => void }).__startPageTour;
+                if (fn) fn();
+              }}
+              className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-indigo-300 transition-colors"
+              title="Take a tour of this page"
+            >
+              <HelpCircle size={16} />
+            </button>
           </>
         )}
       </div>

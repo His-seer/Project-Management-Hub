@@ -2,7 +2,11 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useProjectStore } from '@/stores/useProjectStore';
+import { dashboardTourSteps, TOUR_KEYS } from '@/lib/tours';
+
+const TourStarter = dynamic(() => import('@/components/tour/TourStarter').then((m) => ({ default: m.TourStarter })), { ssr: false });
 import { overallCompleteness } from '@/lib/completeness';
 import { createSampleProject } from '@/lib/sampleData';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -91,6 +95,7 @@ export default function PortfolioDashboard() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full">
+      <TourStarter steps={dashboardTourSteps} tourKey={TOUR_KEYS.DASHBOARD} />
       {/* Header */}
       <div className="pm-page-header">
         <div>
@@ -197,6 +202,7 @@ export default function PortfolioDashboard() {
       )}
 
       {/* Project Cards */}
+      <div data-tour="projects-list" />
       {projectList.length === 0 ? (
         <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
           <div className="mx-auto w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center mb-4">

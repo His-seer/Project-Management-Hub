@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
+import { learningTourSteps, TOUR_KEYS } from '@/lib/tours';
+const TourStarter = dynamic(() => import('@/components/tour/TourStarter').then((m) => ({ default: m.TourStarter })), { ssr: false });
 import {
   CATEGORIES,
   RESOURCES,
@@ -226,6 +229,7 @@ export default function LearnPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full">
+      <TourStarter steps={learningTourSteps} tourKey={TOUR_KEYS.LEARNING} />
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
@@ -238,7 +242,7 @@ export default function LearnPage() {
       </div>
 
       {/* Quiz Banner */}
-      <Link href="/learn/quiz" className="block mb-6 pm-card p-4 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600 transition-colors bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30">
+      <Link href="/learn/quiz" data-tour="quiz-link" className="block mb-6 pm-card p-4 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600 transition-colors bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
@@ -342,7 +346,7 @@ export default function LearnPage() {
 
       {/* ── AI Recommendations ── */}
       {activeCategory === 'ai-recs' && (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="ai-recommendations">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
@@ -473,7 +477,7 @@ export default function LearnPage() {
 
       {/* Learning Paths */}
       {activeCategory === 'paths' && (
-        <div className="space-y-4 mb-8">
+        <div className="space-y-4 mb-8" data-tour="learning-paths">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             🗺️ Guided Learning Paths
           </h2>
