@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useCurrentProject, useProjectId } from '@/hooks/useCurrentProject';
+import { projectTourSteps, TOUR_KEYS } from '@/lib/tours';
+
+const TourStarter = dynamic(() => import('@/components/tour/TourStarter').then((m) => ({ default: m.TourStarter })), { ssr: false });
 import { useProjectStore } from '@/stores/useProjectStore';
 import { calculateCompleteness, overallCompleteness } from '@/lib/completeness';
 import apiFetch from '@/lib/apiFetch';
@@ -212,6 +216,7 @@ export default function ProjectOverview() {
 
   return (
     <>
+    <TourStarter steps={projectTourSteps} tourKey={TOUR_KEYS.PROJECT} />
     {captureImage && <ScreenshotPrint meta={meta} title="Project Overview" subtitle={meta.description} captureImage={captureImage} />}
     <div ref={contentRef} className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
 
@@ -347,7 +352,7 @@ export default function ProjectOverview() {
       )}
 
       {/* ── AI Insights ── */}
-      <div className="pm-card overflow-hidden">
+      <div className="pm-card overflow-hidden" data-tour="ai-generate-btn">
         <div
           className="flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
           onClick={() => setInsightsExpanded(!insightsExpanded)}

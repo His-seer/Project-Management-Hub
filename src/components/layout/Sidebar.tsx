@@ -195,7 +195,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2 scrollbar-thin">
+      <nav className="flex-1 overflow-y-auto py-2 px-2 scrollbar-thin" data-tour="project-tabs">
         {isProjectPage ? (
           <>
             {!collapsed && (
@@ -239,6 +239,7 @@ export function Sidebar() {
                         key={item.href}
                         href={fullHref}
                         onClick={handleNavClick}
+                        {...(item.href === 'workflows' ? { 'data-tour': 'workflow-link' } : {})}
                         className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                           isActive
                             ? 'bg-indigo-500/20 text-indigo-300 font-medium'

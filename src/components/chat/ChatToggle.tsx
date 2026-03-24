@@ -14,6 +14,7 @@ export default function ChatToggle() {
   return (
     <button
       onClick={toggleChat}
+      data-tour="chat-toggle"
       className="fixed bottom-6 right-6 z-40 p-3.5 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 hover:shadow-xl transition-all hover:scale-105 active:scale-95"
       title="Open AI Co-Pilot"
     >
