@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useProjectStore } from '@/stores/useProjectStore';
-import { apiFetch } from '@/lib/apiFetch';
+import apiFetch from '@/lib/apiFetch';
 import { readSseStream, parseAiJson } from '@/lib/aiUtils';
 import {
   ChevronLeft,
