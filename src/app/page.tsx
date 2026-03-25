@@ -73,21 +73,47 @@ export default function PortfolioDashboard() {
     try {
       const summary = projectList.map((p) => ({
         name: p.meta.name,
+        description: p.meta.description || '',
         status: p.meta.status,
         health: p.meta.health,
-        completeness: overallCompleteness(p),
+        completeness: `${overallCompleteness(p)}%`,
+        startDate: p.meta.startDate || 'Not set',
+        targetEndDate: p.meta.targetEndDate || 'Not set',
         openRisks: p.risks?.filter((r) => r.status === 'open').length ?? 0,
+        highRisks: p.risks?.filter((r) => r.status === 'open' && (r.probability * r.impact) >= 12).length ?? 0,
         openIssues: p.issues?.filter((i) => i.status !== 'closed').length ?? 0,
-        startDate: p.meta.startDate,
-        endDate: p.meta.targetEndDate,
+        totalTasks: p.gantt?.tasks?.length ?? 0,
+        completedTasks: p.gantt?.tasks?.filter((t) => t.progress === 100).length ?? 0,
+        teamSize: p.resources?.length ?? 0,
+        budgetTotal: p.plan?.budget?.reduce((s, b) => s + (b.planned ?? 0), 0) ?? 0,
+        charterDefined: !!(p.charter?.vision || p.charter?.executiveSummary),
+        kpiCount: p.kpis?.length ?? 0,
+        stakeholderCount: p.stakeholders?.length ?? 0,
+        topRisks: (p.risks ?? []).filter((r) => r.status === 'open').slice(0, 3).map((r) => r.title || r.description?.slice(0, 50)),
       }));
+      const portfolioMeta = {
+        totalProjects: projectList.length,
+        activeProjects: activeCount,
+        atRiskProjects: atRiskCount,
+        completedProjects: completedCount,
+        onHoldProjects: onHoldCount,
+        overAllocatedResources: overAllocatedCrossProject.map((r) => `${r.name} at ${r.total}%`),
+      };
       const res = await apiFetch('/api/ai/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          project: { meta: { name: 'Portfolio Overview' }, portfolio: summary },
+          project: { meta: { name: 'Portfolio Overview' }, portfolioMeta, projects: summary },
           model: selectedModel,
-          systemPrompt: `You are a senior PMO director analysing a portfolio of ${projectList.length} projects. Provide 3-5 concise portfolio-level insights. For each insight give: title (short), detail (1-2 sentences), type ("warning" for risks/problems, "suggestion" for improvements, "positive" for good news). Return JSON: { "insights": [...] }`,
+          systemPrompt: `You are a senior PMO director reviewing a real portfolio with ${projectList.length} project(s). You have ACTUAL project data below — analyse it specifically, not generically.
+
+RULES:
+- Reference specific project names, numbers, and data points
+- Do NOT give generic advice like "define KPIs" — look at the actual data and comment on what you see
+- If a project has high risks, name them. If completeness is low, say which project
+- If everything looks healthy, say so with specifics
+- Give 3-5 insights. Each: title (short), detail (1-2 sentences referencing real data), type ("warning"/"suggestion"/"positive")
+- Return JSON: { "insights": [...] }`,
         }),
       });
       const raw = await readSseStream(res);
