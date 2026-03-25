@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useAiStore } from '@/stores/useAiStore';
@@ -27,6 +27,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
+  History,
 } from 'lucide-react';
 import { DataManagement } from '@/components/shared/DataManagement';
 import {
@@ -168,7 +169,7 @@ RULES:
   }));
 
   return (
-    <div className="p-8 max-w-7xl mx-auto w-full">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
       <TourStarter steps={dashboardTourSteps} tourKey={TOUR_KEYS.DASHBOARD} />
       {/* Header */}
       <div className="pm-page-header">
@@ -213,7 +214,7 @@ RULES:
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <SummaryCard label="Active" value={activeCount} icon={<TrendingUp size={18} />} color="indigo" />
         <SummaryCard label="At Risk" value={atRiskCount} icon={<AlertTriangle size={18} />} color="amber" />
         <SummaryCard label="Completed" value={completedCount} icon={<CheckCircle2 size={18} />} color="green" />
@@ -322,6 +323,9 @@ RULES:
           </div>
         </div>
       )}
+
+      {/* Activity Timeline */}
+      {projectList.length > 0 && <ActivityTimeline projects={projectList} />}
 
       {/* Project Cards */}
       <div data-tour="projects-list" />
@@ -443,6 +447,81 @@ function SummaryCard({ label, value, icon, color }: { label: string; value: numb
       <div className={`inline-flex p-2.5 rounded-xl mb-3 ${colorMap[color]}`}>{icon}</div>
       <div className="text-2xl font-bold text-slate-900 dark:text-white">{value}</div>
       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function ActivityTimeline({ projects }: { projects: import('@/types').Project[] }) {
+  const [showAll, setShowAll] = useState(false);
+
+  const events = useMemo(() => {
+    const all: { id: string; project: string; projectId: string; summary: string; timestamp: string; module: string }[] = [];
+    projects.forEach((p) => {
+      (p.auditLog ?? []).forEach((entry) => {
+        all.push({
+          id: entry.id,
+          project: p.meta.name,
+          projectId: p.meta.id,
+          summary: entry.summary,
+          timestamp: entry.timestamp,
+          module: entry.module,
+        });
+      });
+    });
+    return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [projects]);
+
+  if (events.length === 0) return null;
+
+  const displayed = showAll ? events.slice(0, 50) : events.slice(0, 8);
+
+  const formatTime = (ts: string) => {
+    const d = new Date(ts);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="pm-card overflow-hidden mb-8">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+          <History size={15} className="text-indigo-500" />
+          Recent Activity
+        </h2>
+        {events.length > 8 && (
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+          >
+            {showAll ? 'Show less' : `View all (${events.length})`}
+          </button>
+        )}
+      </div>
+      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+        {displayed.map((event) => (
+          <Link
+            key={event.id}
+            href={`/projects/${event.projectId}`}
+            className="flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">{event.project}</span>
+              <span className="text-xs text-slate-400 mx-1.5">·</span>
+              <span className="text-xs text-slate-600 dark:text-slate-300">{event.summary}</span>
+            </div>
+            <span className="text-[11px] text-slate-400 flex-shrink-0 whitespace-nowrap">{formatTime(event.timestamp)}</span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
