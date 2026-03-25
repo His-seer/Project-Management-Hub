@@ -120,8 +120,8 @@ export function EditableTable<T extends { id: string }>({
   return (
     <div>
       {/* Search bar + export */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="relative w-64">
+      <div className="mb-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+        <div className="relative w-full sm:w-64">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
