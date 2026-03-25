@@ -21,7 +21,9 @@ import {
   AlertTriangle,
   FileText,
   Wand2,
+  LayoutTemplate,
 } from 'lucide-react';
+import { PROJECT_TEMPLATES, type ProjectTemplate } from '@/lib/projectTemplates';
 
 const steps = ['Quick Start', 'Basic Info', 'Charter', 'Team Setup', 'Initial Risks', 'Review'];
 
@@ -80,6 +82,19 @@ export default function NewProjectWizard() {
     { title: '', description: '' },
   ]);
   const [risksLoading, setRisksLoading] = useState(false);
+
+  // Template application
+  const applyTemplate = (t: ProjectTemplate) => {
+    setName(t.name);
+    setDescription(t.description);
+    setVision(t.charter.vision);
+    setObjectives(t.charter.objectives.join('\n'));
+    setScope(t.charter.scope);
+    setSuggestedRoles(t.stakeholders.map((s) => ({ role: `${s.name} — ${s.role}`, reason: `Power ${s.power}/5, Interest ${s.interest}/5` })));
+    setInitialRisks(t.risks.map((r) => ({ title: r.description.slice(0, 60), description: r.description })));
+    setAiUsed(true);
+    setStep(1);
+  };
 
   // ── AI Quick Start ──────────────────────────────────────────────────────────
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -414,6 +429,31 @@ export default function NewProjectWizard() {
                 >
                   Skip — fill manually
                 </button>
+              </div>
+
+              {/* ── Template Picker ── */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 mb-3">
+                  <LayoutTemplate size={16} className="text-slate-500" />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Or start from a template</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {PROJECT_TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => applyTemplate(t)}
+                      className="text-left p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{t.emoji}</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          {t.name}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{t.description}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}

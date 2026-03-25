@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useProjectStore } from '@/stores/useProjectStore';
+import { useAiStore } from '@/stores/useAiStore';
 import { dashboardTourSteps, TOUR_KEYS } from '@/lib/tours';
+import apiFetch from '@/lib/apiFetch';
+import { readSseStream, parseAiJson } from '@/lib/aiUtils';
 
 const TourStarter = dynamic(() => import('@/components/tour/TourStarter').then((m) => ({ default: m.TourStarter })), { ssr: false });
 import { overallCompleteness } from '@/lib/completeness';
@@ -20,6 +23,10 @@ import {
   ExternalLink,
   Activity,
   Trash2,
+  Sparkles,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { DataManagement } from '@/components/shared/DataManagement';
 import {
@@ -49,10 +56,51 @@ export default function PortfolioDashboard() {
   );
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
+  const selectedModel = useAiStore((s) => s.model);
   const activeCount = projectList.filter((p) => p.meta.status === 'active').length;
   const atRiskCount = projectList.filter((p) => p.meta.health === 'red' || p.meta.health === 'amber').length;
   const completedCount = projectList.filter((p) => p.meta.status === 'completed').length;
   const onHoldCount = projectList.filter((p) => p.meta.status === 'on-hold').length;
+
+  // Portfolio AI Insights
+  const [portfolioInsights, setPortfolioInsights] = useState<{ title: string; detail: string; type: 'warning' | 'suggestion' | 'positive' }[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
+
+  const fetchPortfolioInsights = useCallback(async () => {
+    if (projectList.length === 0) return;
+    setInsightsLoading(true);
+    try {
+      const summary = projectList.map((p) => ({
+        name: p.meta.name,
+        status: p.meta.status,
+        health: p.meta.health,
+        completeness: overallCompleteness(p),
+        openRisks: p.risks?.filter((r) => r.status === 'open').length ?? 0,
+        openIssues: p.issues?.filter((i) => i.status !== 'closed').length ?? 0,
+        startDate: p.meta.startDate,
+        endDate: p.meta.targetEndDate,
+      }));
+      const res = await apiFetch('/api/ai/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project: { meta: { name: 'Portfolio Overview' }, portfolio: summary },
+          model: selectedModel,
+          systemPrompt: `You are a senior PMO director analysing a portfolio of ${projectList.length} projects. Provide 3-5 concise portfolio-level insights. For each insight give: title (short), detail (1-2 sentences), type ("warning" for risks/problems, "suggestion" for improvements, "positive" for good news). Return JSON: { "insights": [...] }`,
+        }),
+      });
+      const raw = await readSseStream(res);
+      const parsed = parseAiJson<{ insights: typeof portfolioInsights } | typeof portfolioInsights>(raw);
+      const insights = Array.isArray(parsed) ? parsed : parsed.insights;
+      setPortfolioInsights(insights);
+      setInsightsOpen(true);
+    } catch (e) {
+      console.error('Portfolio insights failed:', e);
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, [projectList, selectedModel]);
 
   const handleLoadSample = () => {
     const sample = createSampleProject();
@@ -145,6 +193,54 @@ export default function PortfolioDashboard() {
         <SummaryCard label="Completed" value={completedCount} icon={<CheckCircle2 size={18} />} color="green" />
         <SummaryCard label="On Hold" value={onHoldCount} icon={<Clock size={18} />} color="slate" />
       </div>
+
+      {/* Portfolio AI Insights */}
+      {projectList.length > 0 && (
+        <div className="pm-card overflow-hidden mb-8">
+          <div
+            className="flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
+            onClick={() => setInsightsOpen(!insightsOpen)}
+          >
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+              <Sparkles size={15} className="text-purple-500" />
+              Portfolio AI Insights
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); fetchPortfolioInsights(); }}
+                disabled={insightsLoading}
+                className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 disabled:opacity-50"
+              >
+                <RefreshCw size={12} className={insightsLoading ? 'animate-spin' : ''} />
+                {insightsLoading ? 'Analysing...' : portfolioInsights.length ? 'Refresh' : 'Generate'}
+              </button>
+              {insightsOpen ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
+            </div>
+          </div>
+          {insightsOpen && portfolioInsights.length > 0 && (
+            <div className="px-5 pb-4 space-y-2">
+              {portfolioInsights.map((insight, i) => (
+                <div
+                  key={i}
+                  className={`flex items-start gap-3 p-3 rounded-lg text-sm ${
+                    insight.type === 'warning'
+                      ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300'
+                      : insight.type === 'positive'
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-300'
+                  }`}
+                >
+                  {insight.type === 'warning' ? <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" /> : insight.type === 'positive' ? <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0" /> : <Sparkles size={14} className="mt-0.5 flex-shrink-0" />}
+                  <div>
+                    <span className="font-medium">{insight.title}</span>
+                    <span className="ml-1 opacity-80">{insight.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Charts row - only if projects exist */}
       {projectList.length > 0 && (

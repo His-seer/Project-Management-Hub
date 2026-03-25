@@ -44,6 +44,7 @@ import {
   ChevronDown,
   ChevronRight,
   HelpCircle,
+  Search,
 } from 'lucide-react';
 
 const moduleGroups = [
@@ -167,8 +168,23 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* Search hint */}
+      {!collapsed && (
+        <button
+          onClick={() => {
+            const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
+            window.dispatchEvent(e);
+          }}
+          className="mx-2 mt-3 mb-1 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors text-xs"
+        >
+          <Search size={13} />
+          <span className="flex-1 text-left">Search...</span>
+          <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-[10px] font-medium">⌘K</kbd>
+        </button>
+      )}
+
       {/* Portfolio + New Project */}
-      <div className="px-2 pt-3 pb-2 border-b border-slate-700/50 flex-shrink-0" data-tour="sidebar">
+      <div className="px-2 pt-1 pb-2 border-b border-slate-700/50 flex-shrink-0" data-tour="sidebar">
         <Link
           href="/"
           onClick={handleNavClick}

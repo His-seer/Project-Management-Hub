@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 const ChatPanel = dynamic(() => import('@/components/chat/ChatPanel'), { ssr: false });
 const ChatToggle = dynamic(() => import('@/components/chat/ChatToggle'), { ssr: false });
 const NotificationCenter = dynamic(() => import('@/components/notifications/NotificationCenter'), { ssr: false });
+const CommandPalette = dynamic(() => import('@/components/shared/CommandPalette').then((m) => ({ default: m.CommandPalette })), { ssr: false });
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed, openMobileSidebar } = useUiStore();
@@ -42,6 +43,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       <ChatPanel />
       <ChatToggle />
       <NotificationCenter />
+      <CommandPalette />
     </ToastProvider>
   );
 }
