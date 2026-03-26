@@ -65,6 +65,7 @@ export default function NewProjectWizard() {
   const [objectives, setObjectives] = useState('');
   const [scope, setScope] = useState('');
   const [charterLoading, setCharterLoading] = useState(false);
+  const [stepAiError, setStepAiError] = useState('');
 
   // Step 3: Team
   const [teamMembers, setTeamMembers] = useState<{ name: string; role: string }[]>([
@@ -161,7 +162,7 @@ export default function NewProjectWizard() {
       if (data.objectives?.length) setObjectives(data.objectives.join('\n'));
       if (data.scope) setScope(data.scope);
     } catch {
-      // silently fail — user can still type manually
+      setStepAiError('AI charter generation failed. You can still fill in details manually.');
     } finally {
       setCharterLoading(false);
     }
@@ -184,7 +185,7 @@ export default function NewProjectWizard() {
         setTeamMembers(data.teamRoles.map((r) => ({ name: '', role: r.role })));
       }
     } catch {
-      // silent
+      setStepAiError('AI team suggestion failed. You can add roles manually.');
     } finally {
       setTeamLoading(false);
     }
@@ -206,7 +207,7 @@ export default function NewProjectWizard() {
         setInitialRisks(data.risks.slice(0, 5));
       }
     } catch {
-      // silent
+      setStepAiError('AI risk analysis failed. You can add risks manually.');
     } finally {
       setRisksLoading(false);
     }
@@ -215,7 +216,12 @@ export default function NewProjectWizard() {
   // ── Navigation ──────────────────────────────────────────────────────────────
   const canNext = () => {
     if (step === 0) return true; // Quick Start is always skippable
-    if (step === 1) return name.trim() !== '' && startDate !== '' && endDate !== '';
+    if (step === 1) {
+      if (!name.trim() || name.trim().length > 100) return false;
+      if (!startDate || !endDate) return false;
+      if (endDate < startDate) return false;
+      return true;
+    }
     return true;
   };
 
@@ -335,6 +341,14 @@ export default function NewProjectWizard() {
 
         {/* Step Content */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+
+          {stepAiError && (
+            <div className="mb-4 flex items-center gap-2 px-3 py-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <AlertTriangle size={14} className="flex-shrink-0" />
+              {stepAiError}
+              <button onClick={() => setStepAiError('')} className="ml-auto p-0.5 hover:text-amber-900 dark:hover:text-amber-200"><X size={12} /></button>
+            </div>
+          )}
 
           {/* ── STEP 0: AI Quick Start ── */}
           {step === 0 && (
@@ -476,10 +490,14 @@ export default function NewProjectWizard() {
                 <input
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => setName(e.target.value.slice(0, 100))}
+                  maxLength={100}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., Website Redesign"
                 />
+                {name.length > 80 && (
+                  <p className="mt-1 text-xs text-amber-500">{100 - name.length} characters remaining</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -517,6 +535,9 @@ export default function NewProjectWizard() {
                   />
                 </div>
               </div>
+              {startDate && endDate && endDate < startDate && (
+                <p className="text-sm text-red-500">End date must be after start date.</p>
+              )}
             </div>
           )}
 
@@ -775,7 +796,7 @@ export default function NewProjectWizard() {
       <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-8 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <button
-            onClick={() => step > 0 && setStep(step - 1)}
+            onClick={() => { if (step > 0) { setStepAiError(''); setStep(step - 1); } }}
             disabled={step === 0}
             className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -787,7 +808,7 @@ export default function NewProjectWizard() {
 
           {step < steps.length - 1 ? (
             <button
-              onClick={() => canNext() && setStep(step + 1)}
+              onClick={() => { if (canNext()) { setStepAiError(''); setStep(step + 1); } }}
               disabled={!canNext()}
               className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >

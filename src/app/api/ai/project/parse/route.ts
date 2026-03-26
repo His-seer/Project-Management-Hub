@@ -1,8 +1,17 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { streamAndRespond } from '@/lib/aiUtils';
+
+const VALID_MODES = ['full', 'charter', 'risks', 'team'];
 
 export async function POST(req: NextRequest) {
   const { prompt, mode } = await req.json();
+
+  if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
+    return NextResponse.json({ error: 'prompt is required (min 3 characters)' }, { status: 400 });
+  }
+  if (mode && !VALID_MODES.includes(mode)) {
+    return NextResponse.json({ error: `Invalid mode. Must be one of: ${VALID_MODES.join(', ')}` }, { status: 400 });
+  }
 
   // mode: 'full' | 'charter' | 'risks' | 'team'
   const systemPrompts: Record<string, string> = {

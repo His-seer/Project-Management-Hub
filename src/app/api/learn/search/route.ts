@@ -1,11 +1,24 @@
 import { NextRequest } from 'next/server';
-import { streamAndRespond } from '@/lib/aiUtils';
+import { streamAndRespond, parseAiJson, readSseStream } from '@/lib/aiUtils';
+import { validateUrls } from '@/lib/validateUrl';
 
 /**
  * AI-powered learning resource search.
- * Generates curated resource recommendations for any PM topic —
- * returns articles, courses, videos, guides, and tools with real URLs.
+ * Generates curated resource recommendations, then validates every URL
+ * before returning results to the client.
  */
+
+interface AiResource {
+  title: string;
+  description: string;
+  url: string;
+  type: string;
+  provider: string;
+  difficulty: string;
+  youtubeId?: string | null;
+  estimatedMinutes?: number;
+}
+
 export async function POST(req: NextRequest) {
   const { query, type, model } = await req.json() as {
     query: string;
@@ -17,14 +30,15 @@ export async function POST(req: NextRequest) {
 
   const typeFilter = type && type !== 'all' ? `Focus specifically on ${type}s.` : 'Include a mix of articles, courses, videos, guides, and tools.';
 
-  return streamAndRespond({
+  // Step 1: Get AI suggestions via streaming, collect the full response
+  const aiResponse = await streamAndRespond({
     model: model || 'gemini-2.5-flash',
     systemPrompt: `You are a PM learning resource curator. When given a topic, suggest real, high-quality, FREE learning resources with accurate URLs. Only recommend resources that actually exist and are freely accessible. Return ONLY valid JSON.`,
     userMessage: `Find free learning resources about: "${query}"
 
 ${typeFilter}
 
-Return ONLY a JSON array of 6-10 resources:
+Return ONLY a JSON array of 8-12 resources:
 [
   {
     "title": "Resource title",
@@ -44,4 +58,30 @@ IMPORTANT:
 - For YouTube videos, include the actual video ID in youtubeId field
 - Every resource must be FREE to access (or free to audit for courses)`,
   });
+
+  // Step 2: Parse the streamed response to get the JSON array
+  const raw = await readSseStream(aiResponse);
+  let resources: AiResource[];
+  try {
+    resources = parseAiJson<AiResource[]>(raw);
+    if (!Array.isArray(resources)) resources = [];
+  } catch {
+    // If AI returned invalid JSON, return empty with error
+    return Response.json({ results: [], verified: true, error: 'AI returned invalid results' });
+  }
+
+  // Step 3: Validate all URLs concurrently (5 at a time, 5s timeout each)
+  const urls = resources.map((r) => r.url);
+  const validationResults = await validateUrls(urls, { concurrency: 5, timeoutMs: 5000 });
+
+  // Step 4: Filter to only verified resources, add verified flag
+  const verified = resources
+    .map((r, i) => ({
+      ...r,
+      verified: validationResults[i].valid,
+      redirectUrl: validationResults[i].redirectUrl,
+    }))
+    .filter((r) => r.verified);
+
+  return Response.json({ results: verified, verified: true });
 }

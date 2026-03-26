@@ -89,12 +89,14 @@ export default function ChatPanel() {
             onClick={() => clearChat(projectId)}
             className="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
             title="Clear chat"
+            aria-label="Clear chat"
           >
             <Trash2 size={14} />
           </button>
           <button
             onClick={toggleChat}
             className="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            aria-label="Close chat"
           >
             <X size={16} />
           </button>
@@ -231,6 +233,7 @@ export default function ChatPanel() {
             onClick={handleSend}
             disabled={!input.trim() || isStreaming}
             className="shrink-0 p-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Send message"
           >
             {isStreaming ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>

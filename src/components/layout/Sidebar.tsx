@@ -162,6 +162,7 @@ export function Sidebar() {
           <button
             onClick={mobileSidebarOpen ? closeMobileSidebar : toggleSidebar}
             className="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+            aria-label={mobileSidebarOpen ? 'Close sidebar' : 'Collapse sidebar'}
           >
             {mobileSidebarOpen ? <X size={16} /> : <PanelLeftClose size={16} />}
           </button>
@@ -328,6 +329,7 @@ export function Sidebar() {
           <button
             onClick={toggleSidebar}
             className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors mx-auto"
+            aria-label="Expand sidebar"
           >
             <PanelLeftOpen size={16} />
           </button>
@@ -337,6 +339,7 @@ export function Sidebar() {
               onClick={toggleTheme}
               className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
               title={theme === 'light' ? 'Dark mode' : 'Light mode'}
+              aria-label={theme === 'light' ? 'Dark mode' : 'Light mode'}
             >
               {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
@@ -346,6 +349,7 @@ export function Sidebar() {
               data-tour="learning-link"
               className={`p-2 rounded-md hover:bg-slate-800 transition-colors ${pathname === '/learn' ? 'text-indigo-300' : 'text-slate-400 hover:text-slate-200'}`}
               title="PM Learning Hub"
+              aria-label="PM Learning Hub"
             >
               <GraduationCap size={16} />
             </Link>
@@ -353,6 +357,7 @@ export function Sidebar() {
               href="/settings"
               onClick={handleNavClick}
               className={`p-2 rounded-md hover:bg-slate-800 transition-colors ${pathname === '/settings' ? 'text-indigo-300' : 'text-slate-400 hover:text-slate-200'}`}
+              aria-label="Settings"
             >
               <Settings size={16} />
             </Link>
@@ -363,6 +368,7 @@ export function Sidebar() {
               }}
               className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-indigo-300 transition-colors"
               title="Take a tour of this page"
+              aria-label="Take a tour of this page"
             >
               <HelpCircle size={16} />
             </button>

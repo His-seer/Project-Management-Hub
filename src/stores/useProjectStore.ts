@@ -16,37 +16,59 @@ const MODULE_LABELS: Partial<Record<keyof Project, string>> = {
   assumptions: 'Assumptions', statusReports: 'Status Reports', actionItems: 'Action Items',
 };
 
+// Track sync failures — show warning banner if DB is unreachable
+let _syncFailCount = 0;
+let _onSyncError: ((msg: string) => void) | null = null;
+
+/** Register a callback (e.g. toast) to notify user of DB sync failures */
+export function onDbSyncError(cb: (msg: string) => void) { _onSyncError = cb; }
+
+function handleSyncError(context: string, e: unknown) {
+  _syncFailCount++;
+  const msg = e instanceof Error ? e.message : 'Unknown error';
+  console.error(`DB ${context} failed:`, msg);
+  // Notify user on first failure and every 5th after
+  if (_syncFailCount === 1 || _syncFailCount % 5 === 0) {
+    _onSyncError?.(`Failed to save ${context} to database. Your changes may not persist.`);
+  }
+}
+
 // Efficient per-module sync via PATCH
 async function syncModuleToDb(id: string, module: string, data: unknown) {
   try {
-    await apiFetch(`/api/projects/${id}`, {
+    const res = await apiFetch(`/api/projects/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ module, data }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _syncFailCount = 0;
   } catch (e) {
-    console.error('DB module sync failed:', e);
+    handleSyncError(module, e);
   }
 }
 
 // Sync meta fields only
 async function syncMetaToDb(id: string, meta: ProjectMeta) {
   try {
-    await apiFetch(`/api/projects/${id}`, {
+    const res = await apiFetch(`/api/projects/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ module: 'meta', data: meta }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    _syncFailCount = 0;
   } catch (e) {
-    console.error('DB meta sync failed:', e);
+    handleSyncError('project settings', e);
   }
 }
 
 async function deleteProjectFromDb(id: string) {
   try {
-    await apiFetch(`/api/projects/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/projects/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (e) {
-    console.error('DB delete failed:', e);
+    handleSyncError('delete', e);
   }
 }
 

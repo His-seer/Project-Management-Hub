@@ -162,6 +162,7 @@ export default function MeetingsPage() {
                       disabled={isExtracting}
                       className="p-1 text-purple-400 hover:text-purple-600 disabled:opacity-50"
                       title="AI Extract decisions & actions"
+                      aria-label="AI Extract decisions & actions"
                     >
                       <Sparkles size={14} />
                     </button>
@@ -169,6 +170,7 @@ export default function MeetingsPage() {
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteMeeting(meeting.id); }}
                     className="p-1 text-gray-400 hover:text-red-500"
+                    aria-label="Delete meeting"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -342,7 +344,7 @@ function MeetingDecisionsEditor({ decisions, onChange }: { decisions: MeetingDec
         {decisions.map((d, i) => (
           <div key={d.id} className="flex items-center gap-2 text-sm">
             <span className="flex-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded text-gray-700 dark:text-gray-300">{d.decision}</span>
-            <button onClick={() => onChange(decisions.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">
+            <button onClick={() => onChange(decisions.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500" aria-label="Remove decision">
               <X size={12} />
             </button>
           </div>
@@ -356,7 +358,7 @@ function MeetingDecisionsEditor({ decisions, onChange }: { decisions: MeetingDec
           className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
           placeholder="Add a decision"
         />
-        <button onClick={add} className="text-blue-600 text-sm"><Plus size={14} /></button>
+        <button onClick={add} className="text-blue-600 text-sm" aria-label="Add decision"><Plus size={14} /></button>
       </div>
     </div>
   );
@@ -411,7 +413,7 @@ function ActionItemsEditor({ items, onChange }: { items: MeetingActionItem[]; on
               <option value="in-progress">In Progress</option>
               <option value="done">Done</option>
             </select>
-            <button onClick={() => onChange(items.filter((a) => a.id !== item.id))} className="text-gray-400 hover:text-red-500">
+            <button onClick={() => onChange(items.filter((a) => a.id !== item.id))} className="text-gray-400 hover:text-red-500" aria-label="Remove action item">
               <Trash2 size={12} />
             </button>
           </div>

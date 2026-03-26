@@ -281,8 +281,60 @@ export default function QuizPage() {
               </div>
             </div>
 
+            {/* Exam Simulation Presets */}
+            <div className="pm-card p-4">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Quick Presets</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  onClick={() => setPreferences((p) => ({
+                    ...p,
+                    certifications: ['pmp'],
+                    topics: QUIZ_TOPICS.map((t) => t.id),
+                    difficulty: ['intermediate', 'advanced'],
+                    questionCount: 30,
+                    timePerQuestion: 76,
+                  }))}
+                  className="text-left p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors"
+                >
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white">🏆 PMP Exam Prep</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">30 questions · 76s each · All topics</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Real exam: 180 Qs in 230 min</div>
+                </button>
+                <button
+                  onClick={() => setPreferences((p) => ({
+                    ...p,
+                    certifications: ['capm'],
+                    topics: QUIZ_TOPICS.map((t) => t.id),
+                    difficulty: ['beginner', 'intermediate'],
+                    questionCount: 30,
+                    timePerQuestion: 72,
+                  }))}
+                  className="text-left p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors"
+                >
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white">🎯 CAPM Exam Prep</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">30 questions · 72s each · All topics</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Real exam: 150 Qs in 180 min</div>
+                </button>
+                <button
+                  onClick={() => setPreferences((p) => ({
+                    ...p,
+                    certifications: ['agile'],
+                    topics: ['agile', 'stakeholder', 'leadership'],
+                    difficulty: ['intermediate', 'advanced'],
+                    questionCount: 20,
+                    timePerQuestion: 60,
+                  }))}
+                  className="text-left p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors"
+                >
+                  <div className="text-xs font-semibold text-slate-900 dark:text-white">🔄 Agile/Scrum</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">20 questions · 60s each</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">PMI-ACP style questions</div>
+                </button>
+              </div>
+            </div>
+
             {/* Settings */}
-            <div className="pm-card p-4 grid grid-cols-2 gap-4">
+            <div className="pm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Questions</label>
                 <select
@@ -302,8 +354,8 @@ export default function QuizPage() {
                   onChange={(e) => setPreferences((p) => ({ ...p, timePerQuestion: Number(e.target.value) }))}
                   className="field-input mt-1"
                 >
-                  {[30, 45, 60, 90, 120].map((n) => (
-                    <option key={n} value={n}>{n}s</option>
+                  {[30, 45, 60, 72, 76, 90, 120].map((n) => (
+                    <option key={n} value={n}>{n}s{n === 76 ? ' (PMP pace)' : n === 72 ? ' (CAPM pace)' : ''}</option>
                   ))}
                 </select>
               </div>
@@ -313,8 +365,18 @@ export default function QuizPage() {
             <div className="pm-card p-3 bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800">
               <p className="text-xs text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
                 <Sparkles size={12} />
-                AI generates {preferences.questionCount} fresh questions each time based on your preferences. No two quizzes are the same.
+                AI generates {preferences.questionCount} fresh questions each time based on PMBOK 7th Edition, Agile Practice Guide, and Scrum Guide standards. No two quizzes are the same.
               </p>
+              {preferences.certifications.includes('pmp') && (
+                <p className="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 mt-1 ml-5">
+                  PMP exam: 180 questions in 230 minutes (76s/question). Questions follow the 3-domain structure: People (42%), Process (50%), Business Environment (8%).
+                </p>
+              )}
+              {preferences.certifications.includes('capm') && (
+                <p className="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 mt-1 ml-5">
+                  CAPM exam: 150 questions in 180 minutes (72s/question). Covers predictive, agile, and hybrid approaches.
+                </p>
+              )}
             </div>
 
             {quizError && (

@@ -37,6 +37,7 @@ import {
   Trash2,
   Loader2,
   Play,
+  CheckCircle2,
 } from 'lucide-react';
 
 // ── YouTube search result type ──
@@ -188,16 +189,19 @@ export default function LearnPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
       });
-      const raw = await readSseStream(res);
-      const results = parseAiJson<Array<LearningResource & { estimatedMinutes?: number }>>(raw);
-      setAiSearchResults(results.map((r) => ({
-        ...r,
-        id: generateId(),
-        category: 'pm-fundamentals' as ResourceCategory,
-        isFree: true,
-        tags: [],
-        durationMinutes: r.estimatedMinutes,
-      })));
+      const data = await res.json() as { results: Array<LearningResource & { estimatedMinutes?: number; verified?: boolean }>; error?: string };
+      if (data.error && (!data.results || data.results.length === 0)) {
+        setAiSearchResults([]);
+      } else {
+        setAiSearchResults((data.results ?? []).map((r) => ({
+          ...r,
+          id: generateId(),
+          category: 'pm-fundamentals' as ResourceCategory,
+          isFree: true,
+          tags: [],
+          durationMinutes: r.estimatedMinutes,
+        })));
+      }
     } catch { setAiSearchResults([]); }
     finally { setAiSearchLoading(false); }
   };
@@ -687,7 +691,7 @@ function TabButton({ active, onClick, label }: { active: boolean; onClick: () =>
   );
 }
 
-function ResourceCard({ resource: r, compact = false }: { resource: LearningResource; compact?: boolean }) {
+function ResourceCard({ resource: r, compact = false }: { resource: LearningResource & { verified?: boolean }; compact?: boolean }) {
   const Icon = TYPE_ICONS[r.type] || FileText;
   const [showVideo, setShowVideo] = useState(false);
 
@@ -767,6 +771,7 @@ function ResourceCard({ resource: r, compact = false }: { resource: LearningReso
           </span>
           <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{r.type}</span>
           {r.isFree && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">FREE</span>}
+          {r.verified && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-0.5"><CheckCircle2 size={10} /> Verified</span>}
           {r.durationMinutes && !r.youtubeId && <span className="text-[10px] text-slate-400">{r.durationMinutes}min</span>}
         </div>
       </div>

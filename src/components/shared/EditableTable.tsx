@@ -261,6 +261,7 @@ export function EditableTable<T extends { id: string }>({
                     <button
                       onClick={() => handleDeleteRow(row.id)}
                       className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      aria-label="Delete row"
                     >
                       <Trash2 size={14} />
                     </button>

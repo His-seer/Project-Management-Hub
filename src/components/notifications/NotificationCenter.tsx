@@ -85,6 +85,7 @@ export default function NotificationCenter() {
         data-tour="notification-btn"
         className="fixed bottom-6 right-20 z-40 p-3 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
         title="Notifications"
+        aria-label="Notifications"
       >
         <Bell size={20} className="text-slate-600 dark:text-slate-400" />
         {unreadCount > 0 && (
@@ -105,12 +106,14 @@ export default function NotificationCenter() {
                 onClick={() => dismissAll(projectId)}
                 className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600"
                 title="Clear all"
+                aria-label="Clear all notifications"
               >
                 <Trash2 size={13} />
               </button>
               <button
                 onClick={() => setOpen(false)}
                 className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600"
+                aria-label="Close notifications"
               >
                 <X size={14} />
               </button>
@@ -151,7 +154,7 @@ function NotificationItem({ notification: n, onDismiss, onClose }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-slate-900 dark:text-white truncate">{n.title}</span>
-            <button onClick={() => onDismiss(n.id)} className="text-slate-300 hover:text-slate-500 shrink-0">
+            <button onClick={() => onDismiss(n.id)} className="text-slate-300 hover:text-slate-500 shrink-0" aria-label="Dismiss notification">
               <X size={12} />
             </button>
           </div>

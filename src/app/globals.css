@@ -126,7 +126,10 @@ body {
 .field-textarea {
   display: block;
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
   font-size: 0.875rem;
   line-height: 1.5;
   border: 1px solid #e2e8f0;

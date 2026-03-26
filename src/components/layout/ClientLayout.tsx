@@ -1,8 +1,10 @@
 'use client';
+import { useEffect } from 'react';
 import { useUiStore } from '@/stores/useUiStore';
 import { BarChart3, Menu } from 'lucide-react';
 import Link from 'next/link';
-import { ToastProvider } from '@/components/shared/Toast';
+import { ToastProvider, useToast } from '@/components/shared/Toast';
+import { onDbSyncError } from '@/stores/useProjectStore';
 import dynamic from 'next/dynamic';
 
 const ChatPanel = dynamic(() => import('@/components/chat/ChatPanel'), { ssr: false });
@@ -10,16 +12,26 @@ const ChatToggle = dynamic(() => import('@/components/chat/ChatToggle'), { ssr: 
 const NotificationCenter = dynamic(() => import('@/components/notifications/NotificationCenter'), { ssr: false });
 const CommandPalette = dynamic(() => import('@/components/shared/CommandPalette').then((m) => ({ default: m.CommandPalette })), { ssr: false });
 
+function DbSyncWatcher() {
+  const { showToast } = useToast();
+  useEffect(() => {
+    onDbSyncError((msg) => showToast(msg));
+  }, [showToast]);
+  return null;
+}
+
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed, openMobileSidebar } = useUiStore();
 
   return (
     <ToastProvider>
+      <DbSyncWatcher />
       {/* Mobile top bar — hidden on md+ */}
       <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900 flex items-center px-4 gap-3 z-30 border-b border-slate-700/50">
         <button
           onClick={openMobileSidebar}
           className="p-2 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+          aria-label="Open menu"
         >
           <Menu size={20} />
         </button>
