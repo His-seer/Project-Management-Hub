@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import mammoth from 'mammoth';
 import dynamic from 'next/dynamic';
 import { newProjectTourSteps, TOUR_KEYS } from '@/lib/tours';
 const TourStarter = dynamic(() => import('@/components/tour/TourStarter').then((m) => ({ default: m.TourStarter })), { ssr: false });
@@ -102,8 +103,18 @@ export default function NewProjectWizard() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFileName(file.name);
-    const text = await file.text();
-    setAiPrompt(text.slice(0, 8000)); // cap at 8k chars
+
+    let text = '';
+    if (file.name.endsWith('.docx') || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      // Extract plain text from Word document
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      text = result.value;
+    } else {
+      text = await file.text();
+    }
+
+    setAiPrompt(text.slice(0, 80000)); // cap at 80k chars (~10,000 words)
   };
 
   const runAiQuickStart = async () => {
@@ -404,7 +415,7 @@ export default function NewProjectWizard() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt,.md,.csv,.text"
+                  accept=".txt,.md,.csv,.text,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -416,7 +427,7 @@ export default function NewProjectWizard() {
                   {uploadedFileName ? (
                     <span className="text-purple-600 dark:text-purple-400 font-medium">{uploadedFileName}</span>
                   ) : (
-                    'Upload project brief (.txt, .md)'
+                    'Upload project brief (.docx, .txt, .md)'
                   )}
                 </button>
               </div>

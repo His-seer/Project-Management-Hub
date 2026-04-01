@@ -77,13 +77,14 @@ export default function RiskRegisterPage() {
   const [exporting, setExporting] = useState(false);
 
   const selectedModel = useAiStore((s) => s.model);
-  // AI suggestion state
+  // AI suggestion state — supports batch (multiple risks)
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<Map<string, AiSuggestion>>(new Map());
   const [aiTargetRiskId, setAiTargetRiskId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiEditing, setAiEditing] = useState(false);
   const [aiEditValues, setAiEditValues] = useState<AiSuggestion | null>(null);
+  const [aiProgress, setAiProgress] = useState('');
 
   if (!project) return null;
 
@@ -94,38 +95,70 @@ export default function RiskRegisterPage() {
   };
 
   const handleAiSuggest = async () => {
-    const targetRisk = project.risks.find(
+    const targetRisks = project.risks.filter(
       (r) => r.status === 'open' && !r.mitigationStrategy
     );
-    if (!targetRisk) {
+    if (targetRisks.length === 0) {
       setAiError('No open risks without a mitigation strategy found.');
       return;
     }
 
     setAiGenerating(true);
-    setAiSuggestion(null);
-    setAiTargetRiskId(targetRisk.id);
+    setAiSuggestions(new Map());
+    setAiTargetRiskId(null);
     setAiError(null);
     setAiEditing(false);
     setAiEditValues(null);
 
-    try {
-      const res = await apiFetch('/api/ai/risk-mitigation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          risk: targetRisk,
-          projectName: project.meta.name,
-          projectDescription: project.meta.description,
-          model: selectedModel,
-        }),
-      });
-      const raw = await readSseStream(res);
-      setAiSuggestion(parseAiJson<AiSuggestion>(raw));
-    } catch (err: unknown) {
-      setAiError(err instanceof Error ? err.message : 'Failed to generate suggestion.');
-    } finally {
-      setAiGenerating(false);
+    const results = new Map<string, AiSuggestion>();
+    for (let i = 0; i < targetRisks.length; i++) {
+      const risk = targetRisks[i];
+      setAiProgress(`Analyzing risk ${i + 1} of ${targetRisks.length}: ${risk.title}`);
+      try {
+        const res = await apiFetch('/api/ai/risk-mitigation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            risk,
+            projectName: project.meta.name,
+            projectDescription: project.meta.description,
+            model: selectedModel,
+          }),
+        });
+        const raw = await readSseStream(res);
+        results.set(risk.id, parseAiJson<AiSuggestion>(raw));
+      } catch {
+        // Continue with remaining risks even if one fails
+      }
+    }
+
+    if (results.size === 0) {
+      setAiError('Failed to generate suggestions. Please try again.');
+    } else {
+      setAiSuggestions(results);
+      // Show first suggestion for review
+      const firstId = [...results.keys()][0];
+      setAiTargetRiskId(firstId);
+    }
+    setAiProgress('');
+    setAiGenerating(false);
+  };
+
+  const aiSuggestion = aiTargetRiskId ? aiSuggestions.get(aiTargetRiskId) ?? null : null;
+
+  const moveToNextSuggestion = () => {
+    const ids = [...aiSuggestions.keys()];
+    const currentIdx = aiTargetRiskId ? ids.indexOf(aiTargetRiskId) : -1;
+    if (currentIdx < ids.length - 1) {
+      setAiTargetRiskId(ids[currentIdx + 1]);
+      setAiEditing(false);
+      setAiEditValues(null);
+    } else {
+      // All done
+      setAiSuggestions(new Map());
+      setAiTargetRiskId(null);
+      setAiEditing(false);
+      setAiEditValues(null);
     }
   };
 
@@ -145,14 +178,29 @@ export default function RiskRegisterPage() {
         : r
     );
     updateModule(projectId, 'risks', updated);
-    setAiSuggestion(null);
+    moveToNextSuggestion();
+  };
+
+  const handleAiAcceptAll = () => {
+    const updated = project.risks.map((r) => {
+      const suggestion = aiSuggestions.get(r.id);
+      return suggestion
+        ? { ...r, mitigationStrategy: suggestion.mitigationStrategy, contingencyPlan: suggestion.contingencyPlan, updatedAt: new Date().toISOString() }
+        : r;
+    });
+    updateModule(projectId, 'risks', updated);
+    setAiSuggestions(new Map());
     setAiTargetRiskId(null);
     setAiEditing(false);
     setAiEditValues(null);
   };
 
   const handleAiDismiss = () => {
-    setAiSuggestion(null);
+    moveToNextSuggestion();
+  };
+
+  const handleAiDismissAll = () => {
+    setAiSuggestions(new Map());
     setAiTargetRiskId(null);
     setAiError(null);
     setAiEditing(false);
@@ -241,7 +289,7 @@ export default function RiskRegisterPage() {
             className="btn-secondary print-hide disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Sparkles size={15} />
-            {aiGenerating ? 'Analyzing…' : 'AI Suggest'}
+            {aiGenerating ? aiProgress || 'Analyzing…' : 'AI Mitigate All'}
           </button>
           <button
             onClick={handleExport}
@@ -271,8 +319,19 @@ export default function RiskRegisterPage() {
             <h2 className="text-sm font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-2">
               <Sparkles size={16} />
               AI Suggestion for: {targetRiskTitle || 'Unknown Risk'}
+              <span className="text-xs font-normal text-purple-500">
+                ({[...aiSuggestions.keys()].indexOf(aiTargetRiskId!) + 1} of {aiSuggestions.size})
+              </span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {aiSuggestions.size > 1 && (
+                <button
+                  onClick={handleAiAcceptAll}
+                  className="btn-secondary text-xs !py-1 !px-2 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
+                >
+                  <Check size={13} /> Accept All ({aiSuggestions.size})
+                </button>
+              )}
               <button
                 onClick={handleAiAccept}
                 className="btn-secondary text-xs !py-1 !px-2 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
@@ -290,8 +349,16 @@ export default function RiskRegisterPage() {
                 onClick={handleAiDismiss}
                 className="btn-secondary text-xs !py-1 !px-2 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900/30"
               >
-                <X size={13} /> Dismiss
+                <X size={13} /> Skip
               </button>
+              {aiSuggestions.size > 1 && (
+                <button
+                  onClick={handleAiDismissAll}
+                  className="btn-secondary text-xs !py-1 !px-2 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900/30"
+                >
+                  <X size={13} /> Dismiss All
+                </button>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">

@@ -4,7 +4,7 @@ import { useCurrentProject, useProjectId } from '@/hooks/useCurrentProject';
 import { useProjectStore } from '@/stores/useProjectStore';
 import type { Meeting, MeetingDecision, MeetingActionItem } from '@/types';
 import { generateId } from '@/lib/ids';
-import { BookOpen, Plus, Trash2, X, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
+import { BookOpen, Plus, Trash2, X, ChevronDown, ChevronRight, Sparkles, FileText, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import apiFetch from '@/lib/apiFetch';
 import { readSseStream, parseAiJson } from '@/lib/aiUtils';
@@ -28,6 +28,12 @@ export default function MeetingsPage() {
   const [checkedDecisions, setCheckedDecisions] = useState<Set<number>>(new Set());
   const [checkedActions, setCheckedActions] = useState<Set<number>>(new Set());
 
+  // Transcript AI state
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [transcriptError, setTranscriptError] = useState('');
+
   if (!project) return null;
 
   const meetings = project.meetings;
@@ -49,6 +55,56 @@ export default function MeetingsPage() {
     };
     updateMeetings([m, ...meetings]);
     setExpandedId(m.id);
+  };
+
+  const handleTranscriptParse = async () => {
+    if (!transcript.trim() || transcript.trim().length < 20) {
+      setTranscriptError('Please paste a transcript of at least 20 characters.');
+      return;
+    }
+    setTranscriptLoading(true);
+    setTranscriptError('');
+    try {
+      const res = await apiFetch('/api/ai/parse-transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: transcript.trim(),
+          projectName: project.meta.name,
+          model: selectedModel,
+        }),
+      });
+      const raw = await readSseStream(res);
+      const data = parseAiJson<{
+        title: string; date: string; attendees: string[];
+        agenda: string; notes: string;
+        decisions: { decision: string; madeBy: string }[];
+        actionItems: { description: string; owner: string; dueDate: string; status: string }[];
+      }>(raw);
+
+      const m: Meeting = {
+        id: generateId(),
+        title: data.title || 'Parsed Meeting',
+        date: data.date || new Date().toISOString().split('T')[0],
+        attendees: data.attendees || [],
+        agenda: data.agenda || '',
+        notes: data.notes || '',
+        decisions: (data.decisions || []).map((d) => ({
+          id: generateId(), decision: d.decision, madeBy: d.madeBy, date: data.date || new Date().toISOString().split('T')[0],
+        })),
+        actionItems: (data.actionItems || []).map((a) => ({
+          id: generateId(), description: a.description, owner: a.owner, dueDate: a.dueDate || '', status: 'open' as const, escalateToIssue: false,
+        })),
+      };
+      updateMeetings([m, ...meetings]);
+      setExpandedId(m.id);
+      setShowTranscript(false);
+      setTranscript('');
+    } catch (err) {
+      setTranscriptError(err instanceof Error ? err.message : 'Failed to parse transcript.');
+    } finally {
+      setTranscriptLoading(false);
+    }
   };
 
   const updateMeeting = (id: string, partial: Partial<Meeting>) => {
@@ -127,12 +183,57 @@ export default function MeetingsPage() {
         Meeting Minutes
       </h1>
 
-      <button
-        onClick={addMeeting}
-        className="mb-4 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
-      >
-        <Plus size={14} /> New Meeting
-      </button>
+      <div className="mb-4 flex items-center gap-2 flex-wrap">
+        <button
+          onClick={addMeeting}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+        >
+          <Plus size={14} /> New Meeting
+        </button>
+        <button
+          onClick={() => setShowTranscript(!showTranscript)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg"
+        >
+          <FileText size={14} /> From Transcript
+        </button>
+      </div>
+
+      {/* Transcript Input */}
+      {showTranscript && (
+        <div className="mb-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-2 mb-2">
+            <Sparkles size={14} /> Paste a Meeting Transcript
+          </h3>
+          <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
+            The AI will extract the title, attendees, agenda, notes, decisions, and action items automatically.
+          </p>
+          <textarea
+            className="w-full border border-purple-300 dark:border-purple-700 rounded-lg p-3 text-sm bg-white dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400"
+            rows={8}
+            placeholder={"Paste your meeting transcript here...\n\nExample:\nJohn: Let's discuss the Q2 roadmap.\nSarah: I think we should prioritize the mobile app.\nJohn: Agreed. Sarah, can you draft the requirements by Friday?\nMike: I'll handle the backend API design..."}
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+          />
+          {transcriptError && (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1">{transcriptError}</p>
+          )}
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              onClick={handleTranscriptParse}
+              disabled={transcriptLoading || transcript.trim().length < 20}
+              className="btn-secondary text-xs disabled:opacity-50"
+            >
+              {transcriptLoading ? <><Loader2 size={12} className="animate-spin" /> Parsing...</> : <><Sparkles size={12} /> Parse & Create Meeting</>}
+            </button>
+            <button
+              onClick={() => { setShowTranscript(false); setTranscript(''); setTranscriptError(''); }}
+              className="btn-secondary text-xs text-gray-500"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {meetings.length === 0 && (
         <p className="text-gray-400 text-sm">No meetings recorded yet.</p>
